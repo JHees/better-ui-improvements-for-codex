@@ -21,7 +21,7 @@
   "use strict";
 
   const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
-  const VERSION = "1.3.0";
+  const VERSION = "1.4.0";
   const HISTORY_TARGET_STORAGE_KEY = "__codexListPagebusterTarget";
   const HISTORY_TARGET_DEFAULT = 500;
   const HISTORY_TARGET_MIN = 1;
@@ -93,6 +93,20 @@
       defaultEnabled: true,
       status: "可用",
     },
+    {
+      id: "thread-markdown-export",
+      title: "会话 Markdown 导出",
+      detail: "在 Codex 原生会话右键菜单中导出用户和助手消息，不包含工具载荷或隐藏上下文。",
+      defaultEnabled: true,
+      status: "本地普通会话可用；直接使用 Codex 原生 App Server",
+    },
+    {
+      id: "thread-permanent-delete",
+      title: "会话永久删除",
+      detail: "在 Codex 原生会话右键菜单底部增加永久删除；确认后不可恢复。",
+      defaultEnabled: true,
+      status: "本地普通会话可用；不提供撤销或 Codex++ 备份",
+    },
   ]);
   const FEATURE_IDS = Object.freeze(FEATURE_DEFINITIONS.map(({ id }) => id));
   const FEATURE_DEFAULTS = Object.freeze(Object.fromEntries(
@@ -111,10 +125,7 @@
     };
     window.__bennettUiLastLifecycle = payload;
     try {
-      const bridge = window.__codexSessionDeleteBridge;
-      if (typeof bridge === "function") {
-        Promise.resolve(bridge("/diagnostics/log", payload)).catch(() => {});
-      }
+      window.dispatchEvent(new CustomEvent("bennett-ui-lifecycle", { detail: payload }));
     } catch (_) {}
   }
 
@@ -164,6 +175,10 @@
  *                                 project rows in the main sidebar.
  *  • sidebar-conversation-colors Color conversation rows by their native
  *                                 project association.
+ *  • thread-markdown-export Export user and assistant messages from the
+ *                            native thread menu through Codex App Server.
+ *  • thread-permanent-delete Permanently delete a local thread after an
+ *                             explicit irreversible-action confirmation.
  *  • slash-menu-polish  Tightens the composer slash menu with denser rows,
  *                       clearer active state, and calmer section headers.
  *
@@ -241,9 +256,826 @@ function deactivateFeature(state, id) {
   }
 }
 
+const SESSION_ACTION_EXPORT = "export";
+const SESSION_ACTION_DELETE = "delete";
+const sessionThreadActions = createSessionThreadActionsManager();
+
+function createSessionThreadActionsManager() {
+  const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row]";
+  const STYLE_ID = "bennett-thread-context-actions-style";
+  const TOAST_ID = "bennett-thread-context-actions-toasts";
+  const DIALOG_ATTR = "data-bennett-thread-delete-dialog";
+  const EXPORT_ITEM_ID = "bennett-thread-export-markdown";
+  const DELETE_SEPARATOR_ID = "bennett-thread-danger-separator";
+  const DELETE_ITEM_ID = "bennett-thread-delete-permanently";
+  const MENU_SOURCE_MARKERS = [
+    "rename-thread",
+    "archive-thread",
+    "move-thread-to-project",
+    "copy-thread-actions",
+  ];
+  const enabledActions = new Set();
+  const patchedMenuRefs = new Map();
+  const uiTimers = new Set();
+  const retryTimers = new Set();
+  const inFlight = new Set();
+  let api = null;
+  let observer = null;
+  let scanTimer = 0;
+  let resolverPromise = null;
+  let onThreadPointerDown = null;
+  let onWindowFocus = null;
+
+  const log = (level, ...args) => {
+    const target = api?.log?.[level] || console[level] || console.log;
+    try {
+      target.call(api?.log || console, ...args);
+    } catch {}
+  };
+
+  const isChinese = () => /^zh(?:-|$)/i.test(
+    document.documentElement.lang || navigator.language || "",
+  );
+
+  const labels = () => isChinese()
+    ? {
+        export: "导出 Markdown",
+        delete: "永久删除",
+        deleteTitle: "永久删除会话？",
+        deleteBody: "此操作会永久删除“{title}”及其本地数据，且无法撤销。",
+        cancel: "取消",
+        confirmDelete: "永久删除",
+        exporting: "正在导出会话…",
+        exported: "Markdown 已导出",
+        deleting: "正在永久删除会话…",
+        deleted: "会话已永久删除",
+        staleDelete: "删除请求已完成；如果侧栏仍显示该会话，请稍后刷新 Codex。",
+        unavailable: "Codex 原生会话接口暂不可用",
+      }
+    : {
+        export: "Export Markdown",
+        delete: "Delete permanently",
+        deleteTitle: "Delete this chat permanently?",
+        deleteBody: "This permanently deletes “{title}” and its local data. This cannot be undone.",
+        cancel: "Cancel",
+        confirmDelete: "Delete permanently",
+        exporting: "Exporting chat…",
+        exported: "Markdown exported",
+        deleting: "Deleting chat permanently…",
+        deleted: "Chat deleted permanently",
+        staleDelete: "The delete request completed. Refresh Codex later if the chat remains in the sidebar.",
+        unavailable: "The native Codex chat service is unavailable",
+      };
+
+  const nativeMessage = (id, defaultMessage) => ({
+    id: `bennettUi.threadActions.${id}`,
+    defaultMessage,
+    description: "Bennett UI native thread context action",
+  });
+
+  const svgIcon = (path) => {
+    const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${path}" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+
+  const EXPORT_ICON = svgIcon("M10 2.75v9.5m0 0 3.25-3.25M10 12.25 6.75 9M4 13.75v1.5A2 2 0 0 0 6 17.25h8a2 2 0 0 0 2-2v-1.5");
+  const DELETE_ICON = svgIcon("M3.75 5.25h12.5M8 2.75h4l.75 2.5M6 7.5l.5 8.25h7L14 7.5M8.5 9.25v4.5m3-4.5v4.5");
+
+  function ensureStyle() {
+    document.getElementById(STYLE_ID)?.remove();
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      ${THREAD_SELECTOR} .codex-session-more-button,
+      ${THREAD_SELECTOR} .codex-delete-button,
+      ${THREAD_SELECTOR} .codex-session-action-group,
+      ${THREAD_SELECTOR} .codex-session-action-button {
+        display: none !important;
+      }
+
+      #${TOAST_ID} {
+        position: fixed;
+        z-index: 2147483646;
+        right: 20px;
+        bottom: 20px;
+        display: flex;
+        width: min(380px, calc(100vw - 32px));
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      #${TOAST_ID} .bennett-thread-toast {
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        border-radius: 10px;
+        background: var(--color-token-bg-primary, #202020);
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.3);
+        color: var(--color-token-text-primary, #f4f4f4);
+        font-size: 13px;
+        line-height: 1.4;
+        padding: 10px 12px;
+        pointer-events: auto;
+      }
+
+      #${TOAST_ID} .bennett-thread-toast[data-tone="error"] {
+        border-color: color-mix(in srgb, var(--red-400, #fa423e) 55%, transparent);
+      }
+
+      [${DIALOG_ATTR}] {
+        position: fixed;
+        z-index: 2147483647;
+        inset: 0;
+        display: grid;
+        box-sizing: border-box;
+        width: 100vw;
+        max-width: none;
+        height: 100vh;
+        max-height: none;
+        margin: 0;
+        border: 0;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.56);
+        padding: 20px;
+      }
+
+      [${DIALOG_ATTR}]::backdrop {
+        background: transparent;
+      }
+
+      [${DIALOG_ATTR}] .bennett-thread-delete-card {
+        box-sizing: border-box;
+        width: min(440px, 100%);
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+        border-radius: 14px;
+        background: var(--color-token-bg-primary, #202020);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+        color: var(--color-token-text-primary, #f4f4f4);
+        padding: 20px;
+      }
+
+      [${DIALOG_ATTR}] h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        line-height: 1.35;
+      }
+
+      [${DIALOG_ATTR}] p {
+        margin: 0;
+        color: var(--color-token-text-secondary, #b4b4b4);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      [${DIALOG_ATTR}] .bennett-thread-delete-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      [${DIALOG_ATTR}] button {
+        min-height: 34px;
+        border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, currentColor 8%, transparent);
+        color: inherit;
+        cursor: pointer;
+        padding: 6px 12px;
+      }
+
+      [${DIALOG_ATTR}] button:hover {
+        background: color-mix(in srgb, currentColor 13%, transparent);
+      }
+
+      [${DIALOG_ATTR}] .bennett-thread-delete-confirm {
+        border-color: var(--red-400, #fa423e);
+        background: var(--red-400, #fa423e);
+        color: white;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function showToast(message, tone = "info", timeout = 3800) {
+    let root = document.getElementById(TOAST_ID);
+    if (!root) {
+      root = document.createElement("div");
+      root.id = TOAST_ID;
+      root.setAttribute("aria-live", "polite");
+      document.body.appendChild(root);
+    }
+    const toast = document.createElement("div");
+    toast.className = "bennett-thread-toast";
+    toast.dataset.tone = tone;
+    toast.textContent = String(message || "");
+    root.appendChild(toast);
+    const timer = window.setTimeout(() => {
+      uiTimers.delete(timer);
+      toast.remove();
+      if (!root.childElementCount) root.remove();
+    }, timeout);
+    uiTimers.add(timer);
+  }
+
+  function reactFiberFor(node) {
+    if (!(node instanceof HTMLElement)) return null;
+    const key = Object.getOwnPropertyNames(node).find((name) => name.startsWith("__reactFiber$"));
+    return key ? node[key] : null;
+  }
+
+  function threadContextFor(row) {
+    if (!(row instanceof HTMLElement)) return null;
+    const hostId = row.getAttribute("data-app-action-sidebar-thread-host-id") || "";
+    const kind = row.getAttribute("data-app-action-sidebar-thread-kind") || "";
+    const threadKey = row.getAttribute("data-app-action-sidebar-thread-id") || "";
+    const title = row.getAttribute("data-app-action-sidebar-thread-title") ||
+      row.getAttribute("aria-label") || "Untitled chat";
+    let ephemeral = /^(?:true|1)$/i.test(
+      row.getAttribute("data-app-action-sidebar-thread-ephemeral") || "",
+    );
+    for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 18; depth += 1, fiber = fiber.return) {
+      for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+        if (props?.isAeonThread === true || props?.isEphemeral === true) ephemeral = true;
+      }
+    }
+    if (hostId !== "local" || kind !== "local" || !threadKey || ephemeral) return null;
+    return {
+      row,
+      hostId,
+      kind,
+      threadKey,
+      threadId: threadKey.replace(/^local:/, ""),
+      title: String(title).trim() || "Untitled chat",
+    };
+  }
+
+  function threadMenuRefFor(row) {
+    const fibers = [];
+    for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 20; depth += 1, fiber = fiber.return) {
+      fibers.push(fiber, fiber.alternate);
+    }
+    const visited = new Set();
+    for (const fiber of fibers) {
+      if (!fiber || visited.has(fiber)) continue;
+      visited.add(fiber);
+      let hook = fiber.memoizedState;
+      for (let index = 0; hook && index < 160; index += 1, hook = hook.next) {
+        const ref = hook.memoizedState;
+        const candidate = ref?.current;
+        if (typeof candidate !== "function") continue;
+        let source = "";
+        try {
+          source = Function.prototype.toString.call(candidate);
+        } catch {}
+        if (MENU_SOURCE_MARKERS.every((marker) => source.includes(marker))) return ref;
+      }
+    }
+    return null;
+  }
+
+  function restoreMenuRef(ref, record) {
+    if (ref?.current === record.wrapped) ref.current = record.original;
+    patchedMenuRefs.delete(ref);
+  }
+
+  function appendThreadActions(items, context) {
+    if (!Array.isArray(items) || !context) return items;
+    const next = items.filter((item) => ![
+      EXPORT_ITEM_ID,
+      DELETE_SEPARATOR_ID,
+      DELETE_ITEM_ID,
+    ].includes(item?.id));
+    const text = labels();
+
+    if (enabledActions.has(SESSION_ACTION_EXPORT)) {
+      const exportItem = {
+        id: EXPORT_ITEM_ID,
+        icon: EXPORT_ICON,
+        message: nativeMessage("exportMarkdown", text.export),
+        onSelect: () => void exportThread(context),
+      };
+      const copyIndex = next.findIndex((item) => item?.id === "copy-thread-actions");
+      const newWindowIndex = next.findIndex((item) => item?.id === "new-window-separator");
+      const insertAt = copyIndex >= 0 ? copyIndex : newWindowIndex >= 0 ? newWindowIndex : next.length;
+      next.splice(insertAt, 0, exportItem);
+    }
+
+    if (enabledActions.has(SESSION_ACTION_DELETE)) {
+      if (next.length && next[next.length - 1]?.type !== "separator") {
+        next.push({ id: DELETE_SEPARATOR_ID, type: "separator" });
+      }
+      next.push({
+        id: DELETE_ITEM_ID,
+        icon: DELETE_ICON,
+        message: nativeMessage("deletePermanently", text.delete),
+        destructive: true,
+        danger: true,
+        tone: "danger",
+        onSelect: () => void deleteThreadPermanently(context),
+      });
+    }
+    return next;
+  }
+
+  function patchMenus() {
+    const activeRefs = new Set();
+    for (const row of document.querySelectorAll(THREAD_SELECTOR)) {
+      const context = threadContextFor(row);
+      if (!context) continue;
+      const ref = threadMenuRefFor(row);
+      if (!ref) continue;
+      activeRefs.add(ref);
+      let record = patchedMenuRefs.get(ref);
+      if (record && ref.current === record.wrapped) {
+        record.context = context;
+        continue;
+      }
+      if (record) patchedMenuRefs.delete(ref);
+      let original = ref.current;
+      if (typeof original !== "function") continue;
+      if (original.__bennettThreadMenuOriginal) original = original.__bennettThreadMenuOriginal;
+      record = { context, original, wrapped: null };
+      record.wrapped = function bennettThreadContextItems(...args) {
+        const result = record.original.apply(this, args);
+        if (result && typeof result.then === "function") {
+          return result.then((items) => appendThreadActions(items, record.context));
+        }
+        return appendThreadActions(result, record.context);
+      };
+      record.wrapped.__bennettThreadMenuOriginal = original;
+      try {
+        ref.current = record.wrapped;
+        if (ref.current === record.wrapped) patchedMenuRefs.set(ref, record);
+      } catch (error) {
+        log("warn", "thread native menu hook unavailable", error);
+      }
+    }
+    for (const [ref, record] of patchedMenuRefs) {
+      if (!activeRefs.has(ref)) restoreMenuRef(ref, record);
+    }
+  }
+
+  function schedulePatch(delay = 80) {
+    if (!enabledActions.size) return;
+    if (scanTimer) window.clearTimeout(scanTimer);
+    scanTimer = window.setTimeout(() => {
+      scanTimer = 0;
+      patchMenus();
+    }, delay);
+  }
+
+  function scopeFromRow(row) {
+    const requiredFunctions = ["get", "set", "watch", "when"];
+    const candidates = [];
+    for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 20; depth += 1, fiber = fiber.return) {
+      for (const candidateFiber of [fiber, fiber.alternate]) {
+        let hook = candidateFiber?.memoizedState;
+        for (let index = 0; hook && index < 160; index += 1, hook = hook.next) {
+          const state = hook.memoizedState;
+          candidates.push(state?.current, state?.scope, state);
+        }
+      }
+    }
+    return candidates.find((candidate) =>
+      candidate && typeof candidate === "object" &&
+      "query" in candidate && "queryClient" in candidate &&
+      requiredFunctions.every((key) => typeof candidate[key] === "function"),
+    ) || null;
+  }
+
+  function localModuleUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw, document.baseURI);
+      return url.protocol === "app:" && url.host === new URL(document.baseURI).host ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function discoverAppInitialUrls() {
+    const urls = new Set();
+    const collect = (value, base = document.baseURI) => {
+      const match = String(value || "").match(
+        /(?:\.\/|\/)?(?:assets\/)?app-initial-[A-Za-z0-9_-]+\.js/,
+      );
+      if (match) {
+        let resolved = match[0];
+        try {
+          resolved = new URL(match[0], base).href;
+        } catch {}
+        const url = localModuleUrl(resolved);
+        if (url) urls.add(url);
+      }
+    };
+    for (const script of document.querySelectorAll("script[src]")) collect(script.src);
+    try {
+      for (const resource of performance.getEntriesByType("resource")) collect(resource.name);
+    } catch {}
+    for (const script of document.querySelectorAll("script[src]")) {
+      const src = localModuleUrl(script.src);
+      if (!src) continue;
+      try {
+        const response = await fetch(src);
+        if (response.ok) collect(await response.text(), src);
+      } catch {}
+    }
+    return Array.from(urls);
+  }
+
+  function resolverFromModule(mod) {
+    for (const value of Object.values(mod || {})) {
+      if (typeof value !== "function") continue;
+      try {
+        const source = Function.prototype.toString.call(value);
+        if (source.includes("AppServerManager RPC is not connected") && source.includes(".forHost(")) {
+          return value;
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  async function loadResolver() {
+    if (!resolverPromise) {
+      resolverPromise = (async () => {
+        let lastError = null;
+        for (const url of await discoverAppInitialUrls()) {
+          try {
+            const mod = await import(url);
+            const resolver = resolverFromModule(mod);
+            if (resolver) return resolver;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError || new Error(labels().unavailable);
+      })().catch((error) => {
+        resolverPromise = null;
+        throw error;
+      });
+    }
+    return resolverPromise;
+  }
+
+  async function sendNativeRequest(context, method, payload) {
+    const scope = scopeFromRow(context.row);
+    if (!scope) throw new Error(labels().unavailable);
+    const resolver = await loadResolver();
+    const client = resolver(scope, context.hostId);
+    if (!client || typeof client.sendRequest !== "function") {
+      throw new Error(labels().unavailable);
+    }
+    return client.sendRequest(method, payload);
+  }
+
+  function threadFromResponse(response) {
+    return response?.thread || response?.result?.thread || response?.result || response;
+  }
+
+  function timestampValue(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value < 1e12 ? value * 1000 : value;
+    }
+    const parsed = Date.parse(String(value || ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function displayTimestamp(value) {
+    const timestamp = timestampValue(value);
+    if (!timestamp) return "Unknown time";
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "medium",
+      }).format(new Date(timestamp));
+    } catch {
+      return new Date(timestamp).toISOString();
+    }
+  }
+
+  function oneLine(value, fallback = "") {
+    return String(value ?? fallback).replace(/[\r\n]+/g, " ").trim();
+  }
+
+  function codeSpan(value) {
+    return `\`${String(value ?? "").replace(/`/g, "\\`")}\``;
+  }
+
+  function markdownForThread(thread, fallbackContext) {
+    const title = oneLine(thread?.name || thread?.title || fallbackContext.title, "Untitled chat");
+    const exportedAt = new Date().toISOString();
+    const cwd = thread?.cwd || thread?.workspace?.cwd || "";
+    const lines = [
+      `# ${title}`,
+      "",
+      `- Exported: ${exportedAt}`,
+      `- Thread ID: ${codeSpan(thread?.id || fallbackContext.threadId)}`,
+    ];
+    if (cwd) lines.push(`- Working directory: ${codeSpan(cwd)}`);
+    lines.push("");
+
+    const turns = Array.isArray(thread?.turns)
+      ? thread.turns.map((turn, index) => ({ turn, index })).sort((a, b) => {
+          const delta = timestampValue(a.turn?.startedAt || a.turn?.createdAt) -
+            timestampValue(b.turn?.startedAt || b.turn?.createdAt);
+          return delta || a.index - b.index;
+        })
+      : [];
+    let messageCount = 0;
+    for (const { turn } of turns) {
+      const time = displayTimestamp(turn?.startedAt || turn?.createdAt);
+      const items = Array.isArray(turn?.items) ? turn.items : [];
+      for (const item of items) {
+        if (item?.type === "userMessage") {
+          const parts = [];
+          const content = Array.isArray(item.content) ? item.content : [];
+          for (const part of content) {
+            if (typeof part === "string" && part.trim()) parts.push(part.trim());
+            else if (part?.type === "text" && String(part.text || "").trim()) parts.push(String(part.text).trim());
+            else if (part?.type === "localImage" && part.path) {
+              parts.push(`*[Local image: ${codeSpan(part.path)}]*`);
+            }
+          }
+          if (!parts.length && String(item.text || "").trim()) parts.push(String(item.text).trim());
+          if (!parts.length) continue;
+          lines.push(`## User — ${time}`, "", parts.join("\n\n"), "");
+          messageCount += 1;
+          continue;
+        }
+        if (item?.type !== "agentMessage") continue;
+        const phase = String(item.phase || "").toLowerCase();
+        if (phase === "analysis" || phase === "reasoning") continue;
+        const text = String(item.text || "").trim();
+        if (!text) continue;
+        lines.push(`## Assistant — ${time}`, "", text, "");
+        messageCount += 1;
+      }
+    }
+    if (!messageCount) lines.push("*No exportable user or assistant messages were found.*", "");
+    return `${lines.join("\n").trim()}\n`;
+  }
+
+  function safeFilename(title) {
+    const date = new Date().toISOString().slice(0, 10);
+    const base = oneLine(title, "Codex chat")
+      .replace(/[<>:\"/\\|?*\u0000-\u001f]/g, "-")
+      .replace(/[. ]+$/g, "")
+      .slice(0, 96) || "Codex chat";
+    return `${base}-${date}.md`;
+  }
+
+  async function saveMarkdown(filename, markdown) {
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    if (typeof window.showSaveFilePicker === "function") {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: "Markdown",
+            accept: { "text/markdown": [".md"] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return true;
+      } catch (error) {
+        if (error?.name === "AbortError") return false;
+        throw error;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+
+  async function exportThread(context) {
+    const key = `${SESSION_ACTION_EXPORT}:${context.threadKey}`;
+    if (inFlight.has(key)) return;
+    inFlight.add(key);
+    showToast(labels().exporting, "info", 1800);
+    try {
+      const response = await sendNativeRequest(context, "thread/read", {
+        threadId: context.threadId,
+        includeTurns: true,
+      });
+      const thread = threadFromResponse(response);
+      const markdown = markdownForThread(thread, context);
+      const saved = await saveMarkdown(safeFilename(thread?.name || context.title), markdown);
+      if (saved) showToast(labels().exported);
+    } catch (error) {
+      log("error", "thread Markdown export failed", error);
+      showToast(error?.message || String(error), "error", 6000);
+    } finally {
+      inFlight.delete(key);
+    }
+  }
+
+  function confirmPermanentDelete(context) {
+    document.querySelector(`[${DIALOG_ATTR}]`)?.remove();
+    const text = labels();
+    const overlay = document.createElement("dialog");
+    overlay.setAttribute(DIALOG_ATTR, "true");
+    overlay.innerHTML = `
+      <div class="bennett-thread-delete-card" role="dialog" aria-modal="true" aria-labelledby="bennett-thread-delete-title">
+        <h2 id="bennett-thread-delete-title"></h2>
+        <p></p>
+        <div class="bennett-thread-delete-actions">
+          <button type="button" data-bennett-delete-cancel="true"></button>
+          <button type="button" class="bennett-thread-delete-confirm" data-bennett-delete-confirm="true"></button>
+        </div>
+      </div>
+    `;
+    overlay.querySelector("h2").textContent = text.deleteTitle;
+    overlay.querySelector("p").textContent = text.deleteBody.replace("{title}", context.title);
+    const cancel = overlay.querySelector("[data-bennett-delete-cancel]");
+    const confirm = overlay.querySelector("[data-bennett-delete-confirm]");
+    cancel.textContent = text.cancel;
+    confirm.textContent = text.confirmDelete;
+    const previousFocus = document.activeElement;
+    document.body.appendChild(overlay);
+    if (typeof overlay.showModal === "function") overlay.showModal();
+    else overlay.setAttribute("open", "");
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener("keydown", onKeyDown, true);
+        window.removeEventListener("keyup", onKeyDown, true);
+        overlay.remove();
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+        resolve(value);
+      };
+      const onKeyDown = (event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        finish(false);
+      };
+      cancel.addEventListener("click", () => finish(false));
+      confirm.addEventListener("click", () => finish(true));
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) finish(false);
+      });
+      overlay.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        finish(false);
+      });
+      // Listen on window so Codex's document-level shortcuts cannot consume
+      // Escape before the irreversible-action dialog sees it.
+      window.addEventListener("keydown", onKeyDown, true);
+      window.addEventListener("keyup", onKeyDown, true);
+      window.queueMicrotask(() => cancel.focus());
+    });
+  }
+
+  async function deleteThreadPermanently(context) {
+    const key = `${SESSION_ACTION_DELETE}:${context.threadKey}`;
+    if (inFlight.has(key)) return;
+    if (!await confirmPermanentDelete(context)) return;
+    inFlight.add(key);
+    showToast(labels().deleting, "info", 1800);
+    try {
+      const readResponse = await sendNativeRequest(context, "thread/read", {
+        threadId: context.threadId,
+        includeTurns: false,
+      });
+      const thread = threadFromResponse(readResponse);
+      if (thread?.ephemeral === true || thread?.isEphemeral === true) {
+        throw new Error("Ephemeral chats cannot be permanently deleted");
+      }
+      await sendNativeRequest(context, "thread/delete", { threadId: context.threadId });
+      showToast(labels().deleted);
+      const timer = window.setTimeout(() => {
+        uiTimers.delete(timer);
+        if (context.row?.isConnected) showToast(labels().staleDelete, "info", 6000);
+      }, 2200);
+      uiTimers.add(timer);
+    } catch (error) {
+      log("error", "thread permanent delete failed", error);
+      showToast(error?.message || String(error), "error", 6000);
+    } finally {
+      inFlight.delete(key);
+    }
+  }
+
+  function start() {
+    ensureStyle();
+    observer = new MutationObserver(() => schedulePatch());
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: [
+        "data-app-action-sidebar-thread-host-id",
+        "data-app-action-sidebar-thread-id",
+        "data-app-action-sidebar-thread-kind",
+        "data-app-action-sidebar-thread-row",
+      ],
+      childList: true,
+      subtree: true,
+    });
+    onThreadPointerDown = (event) => {
+      const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      if (!target?.closest?.(THREAD_SELECTOR)) return;
+      // React can replace a row's hook ref without changing the DOM. Re-wrap
+      // immediately before Codex's own handler reads it; do not prevent or
+      // replace the native pointer/context-menu event.
+      patchMenus();
+    };
+    onWindowFocus = () => schedulePatch(0);
+    document.addEventListener("pointerdown", onThreadPointerDown, true);
+    document.addEventListener("contextmenu", onThreadPointerDown, true);
+    window.addEventListener("focus", onWindowFocus);
+    patchMenus();
+    schedulePatch(300);
+    for (const delay of [800, 1800, 3500]) {
+      const timer = window.setTimeout(() => {
+        retryTimers.delete(timer);
+        patchMenus();
+      }, delay);
+      retryTimers.add(timer);
+    }
+    log("info", "native thread context actions active", Array.from(enabledActions));
+  }
+
+  function stop() {
+    observer?.disconnect();
+    observer = null;
+    if (onThreadPointerDown) {
+      document.removeEventListener("pointerdown", onThreadPointerDown, true);
+      document.removeEventListener("contextmenu", onThreadPointerDown, true);
+      onThreadPointerDown = null;
+    }
+    if (onWindowFocus) {
+      window.removeEventListener("focus", onWindowFocus);
+      onWindowFocus = null;
+    }
+    if (scanTimer) window.clearTimeout(scanTimer);
+    scanTimer = 0;
+    for (const timer of retryTimers) window.clearTimeout(timer);
+    retryTimers.clear();
+    for (const [ref, record] of patchedMenuRefs) restoreMenuRef(ref, record);
+    for (const timer of uiTimers) window.clearTimeout(timer);
+    uiTimers.clear();
+    inFlight.clear();
+    document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(TOAST_ID)?.remove();
+    document.querySelector(`[${DIALOG_ATTR}] [data-bennett-delete-cancel]`)?.click();
+    document.querySelector(`[${DIALOG_ATTR}]`)?.remove();
+    resolverPromise = null;
+  }
+
+  return {
+    enable(action, nextApi) {
+      api = nextApi || api;
+      const wasEmpty = enabledActions.size === 0;
+      enabledActions.add(action);
+      if (wasEmpty) start();
+      else schedulePatch(0);
+      let active = true;
+      return () => {
+        if (!active) return;
+        active = false;
+        enabledActions.delete(action);
+        if (!enabledActions.size) stop();
+        else schedulePatch(0);
+      };
+    },
+    status() {
+      const rows = Array.from(document.querySelectorAll(THREAD_SELECTOR));
+      return {
+        enabledActions: Array.from(enabledActions),
+        patchedMenuCount: patchedMenuRefs.size,
+        inFlightCount: inFlight.size,
+        rowCount: rows.length,
+        supportedRowCount: rows.filter((row) => Boolean(threadContextFor(row))).length,
+        discoverableMenuCount: rows.filter((row) => Boolean(threadMenuRefFor(row))).length,
+      };
+    },
+  };
+}
+
 // ─────────────────────────────────────────────────────────────── features ──
 
 const FEATURES = {
+  "thread-markdown-export"(api) {
+    return sessionThreadActions.enable(SESSION_ACTION_EXPORT, api);
+  },
+
+  "thread-permanent-delete"(api) {
+    return sessionThreadActions.enable(SESSION_ACTION_DELETE, api);
+  },
+
   /**
    * Render LaTeX inside Codex's right-side Markdown file preview.
    *
@@ -8131,7 +8963,7 @@ function writeFlag(api, id, on) {
       <div class="codex-plus-row bennett-ui-settings-head">
         <div>
           <div class="codex-plus-row-title">Bennett UI Improvements ${escapeHtmlLocal(VERSION)}</div>
-          <div class="codex-plus-row-description">项目和会话侧栏、额度显示、Markdown 预览与原生会话查询上限设置。</div>
+          <div class="codex-plus-row-description">项目和会话侧栏、额度显示、Markdown 预览、会话右键操作与原生历史查询上限设置。</div>
         </div>
       </div>
       ${featureInfo.map((item) => `
@@ -8329,6 +9161,9 @@ function writeFlag(api, id, on) {
     api,
     features,
     featureInfo,
+    threadActionsStatus() {
+      return sessionThreadActions.status();
+    },
     setFeature(id, enabled, reload = false) {
       setFeatureEnabled(id, enabled);
       if (reload) window.location.reload();

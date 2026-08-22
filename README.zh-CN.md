@@ -4,7 +4,7 @@
 
 **专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.3.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,7 +13,7 @@
 
 </div>
 
-Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 renderer-only 用户脚本。它将项目化侧栏、真实额度显示、Markdown 预览增强、原生会话查询上限设置和独立设置面板整合为一个可直接安装的脚本。
+Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 renderer-only 用户脚本。它将项目化侧栏、真实额度显示、Markdown 预览增强、原生会话导出和永久删除、原生会话查询上限设置以及独立设置面板整合为一个可直接安装的脚本。
 
 本项目将 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移到 BigPizzaV3 用户脚本运行时，并保留原作者与 MIT 许可证声明。迁移版本由 [JHees](https://github.com/JHees) 维护。
 
@@ -25,6 +25,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 | 额度 | 真实的 5 小时与 Weekly 额度、可选 Credit、重置时间提示和明确的 `API` 模式。 |
 | 历史会话 | 将 Codex 原生近期会话查询上限由默认 50 条提高到可配置的 1–2000 条，不接管会话管理。 |
 | Markdown | KaTeX 公式、数学表格、图片、相对图片路径和公式源码查看。 |
+| 会话操作 | 在 Codex 自带会话右键菜单中增加 Markdown 导出和确认式永久删除，同时保留原生项目移动。 |
 | 设置 | 独立 Bennett UI 设置页，集中管理功能开关和会话加载数量。 |
 | 降低干扰 | 隐藏 Codex 额度耗尽提示和 Plus/Pro 升级提示，同时保留输入框和 Codex 软件更新提示。 |
 
@@ -61,11 +62,21 @@ Bennett UI 从 1.2.1 起已经内置原生会话加载器，**不需要**再单�
 | 设置搜索 | 开启 | 稳定 |
 | 匹配设置页侧栏宽度 | 开启 | 稳定 |
 | 斜杠菜单优化 | 开启 | 稳定 |
+| 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
+| 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 | 原生会话查询上限 | 自动 | 每次启动请求；可设置 1–2000 条并手动重试 |
 
 所有功能开关和会话加载入口都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
+
+## 原生会话右键操作
+
+- **移动到项目**和**移出项目**继续使用 Codex 原生实现，Bennett 不重复添加或替换。
+- **导出 Markdown**位于原生分享和复制操作附近，按时间顺序导出用户与助手文本，并保留本地图片路径标记；系统/开发者上下文、推理和工具载荷不会写入文件。
+- **永久删除**位于菜单最底部并使用危险操作样式，必须明确确认；它调用 Codex 原生 `thread/delete`，不提供 Bennett 或 Codex++ 备份与撤销。
+- 两项功能各有独立开关。任一功能启用时，会隐藏 Codex++ 旧的行内“更多/删除”按钮，但不会影响 Codex 原生的置顶和归档按钮。
+- 两项功能直接调用本地 Codex App Server，不依赖 Codex++ 会话删除 bridge 或 helper 服务。
 
 ## 会话项目着色
 
