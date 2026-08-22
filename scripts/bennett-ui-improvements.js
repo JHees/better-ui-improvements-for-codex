@@ -21,7 +21,7 @@
   "use strict";
 
   const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
-  const VERSION = "1.4.0";
+  const VERSION = "1.4.1";
   const HISTORY_TARGET_STORAGE_KEY = "__codexListPagebusterTarget";
   const HISTORY_TARGET_DEFAULT = 500;
   const HISTORY_TARGET_MIN = 1;
@@ -8504,7 +8504,9 @@ const FEATURES = {
       const visited = new Set();
 
       // Priority and recent views no longer expose project attributes in the
-      // DOM, but the native hover-card props still carry the same association.
+      // DOM, but assigned threads still carry a stable project id in their
+      // native hover-card props. A label without an id is only the basename of
+      // the thread's working directory and must not be treated as membership.
       for (let depth = 0; fiber && depth < 12 && !visited.has(fiber); depth += 1) {
         visited.add(fiber);
         for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
@@ -8516,13 +8518,14 @@ const FEATURES = {
           const label = typeof props.hoverCardProjectLabel === "string"
             ? props.hoverCardProjectLabel.trim()
             : "";
-          if (id || label) {
+          if (id) {
             return {
               id,
               label,
-              key: id ? `id:${normalize(id)}` : `label:${normalize(label)}`,
+              key: `id:${normalize(id)}`,
             };
           }
+          if (label) return false;
         }
         fiber = fiber.return;
       }

@@ -4,7 +4,7 @@
 
 **专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.1-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -69,6 +69,8 @@ Bennett UI 从 1.2.1 起已经内置原生会话加载器，**不需要**再单�
 所有功能开关和会话加载入口都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
+
+会话着色必须取得 Codex 的稳定项目 ID。普通会话中显示的工作目录名称不会再被视为项目归属。
 
 ## 原生会话右键操作
 

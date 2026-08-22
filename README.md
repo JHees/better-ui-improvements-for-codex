@@ -4,7 +4,7 @@
 
 **A focused UI and workflow upgrade for BigPizzaV3 Codex++.**
 
-[![Version](https://img.shields.io/badge/version-1.4.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.1-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -69,6 +69,8 @@ Enable the script in Codex++ and reload user scripts. A full Codex restart is no
 Feature switches and the history loader are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads.
 
 Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
+
+Conversation colors require Codex's stable project ID. A working-directory name shown in an ordinary chat is not treated as project membership.
 
 ## Native thread context actions
 
