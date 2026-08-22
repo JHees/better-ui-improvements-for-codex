@@ -21,7 +21,7 @@
   "use strict";
 
   const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
-  const VERSION = "1.2.5";
+  const VERSION = "1.3.0";
   const HISTORY_TARGET_STORAGE_KEY = "__codexListPagebusterTarget";
   const HISTORY_TARGET_DEFAULT = 500;
   const HISTORY_TARGET_MIN = 1;
@@ -29,6 +29,75 @@
   const SCRIPT_LOAD_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lifecycleTimers = new Set();
   const lifecycleSignatures = new Set();
+  const FEATURE_DEFINITIONS = Object.freeze([
+    {
+      id: "hide-upgrade-prompts",
+      title: "隐藏升级提示",
+      detail: "隐藏 Plus/Pro 套餐升级提示，但保留 Codex 软件更新提示。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "show-usage-in-sidebar",
+      title: "5 小时 / 周 / Credit 额度",
+      detail: "优先通过 Codex renderer fetch bridge 读取 /wham/usage；默认显示 5h，点击可切换 Weekly；只有实际收到点数数据时才显示 Credit，API 模式显示 API。",
+      defaultEnabled: true,
+      status: "当前页面暴露额度信号时可用",
+    },
+    {
+      id: "hide-usage-alert",
+      title: "隐藏额度耗尽提示",
+      detail: "隐藏额度用完后的弹窗、重置提示和额度卡片。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "settings-search",
+      title: "设置搜索",
+      detail: "给 Codex 设置页增加搜索框。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "match-sidebar-width",
+      title: "匹配设置页侧栏宽度",
+      detail: "让设置页侧栏宽度与主侧栏对齐。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "sidebar-project-backgrounds",
+      title: "项目背景和颜色",
+      detail: "为项目行增加分组背景，并保留旧的项目颜色偏好。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "sidebar-conversation-colors",
+      title: "会话项目着色",
+      detail: "让会话行继承所属项目的颜色；无法识别项目的会话保持默认样式。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "render-markdown-preview-math",
+      title: "Markdown 预览增强",
+      detail: "在右侧 .md 文件预览中渲染 LaTeX、数学表格和图片；相对图片路径以当前文档为基准，点击内容可原位编辑源码。",
+      defaultEnabled: true,
+      status: "支持 $…$、$$…$$、\\(…\\) 和 \\[…\\]",
+    },
+    {
+      id: "slash-menu-polish",
+      title: "斜杠菜单优化",
+      detail: "压缩斜杠菜单行距，并强化选中状态。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+  ]);
+  const FEATURE_IDS = Object.freeze(FEATURE_DEFINITIONS.map(({ id }) => id));
+  const FEATURE_DEFAULTS = Object.freeze(Object.fromEntries(
+    FEATURE_DEFINITIONS.map(({ id, defaultEnabled }) => [id, defaultEnabled]),
+  ));
 
   function reportLifecycle(event, detail = {}) {
     const signature = `${event}:${JSON.stringify(detail)}`;
@@ -87,14 +156,10 @@
  *                          Red when <15% remaining.
  *                          Sources data from Codex's authenticated
  *                          /wham/usage app-server endpoint.
- *  • square-sidebar        Flatten the rounded seam between sidebar and
- *                          main content panel.
  *  • settings-search       Adds a small search field to Codex Settings.
  *  • match-sidebar-width   Force the settings page sidebar to match the
  *                          main UI sidebar's width, eliminating the
  *                          layout jump when opening/closing Settings.
- *  • sidebar-action-grid   Render the four main sidebar actions as a 2x2
- *                          grid of filled buttons.
  *  • sidebar-project-backgrounds  Add subtle grouped backgrounds behind
  *                                 project rows in the main sidebar.
  *  • sidebar-conversation-colors Color conversation rows by their native
@@ -113,55 +178,12 @@
 /** @type {import("@codex-plusplus/sdk").Tweak} */
 module.exports = {
   start(api) {
-    if (api.process === "main") {
-      startMainUsageProvider(api);
-      startMainSlashMenuShortcutBridge(api);
-      return;
-    }
-
     const state = {
       api,
       features: new Map(/* id -> { dispose } */),
-      defaults: {
-        "hide-upgrade-prompts": true,
-        "show-usage-in-sidebar": true,
-        "square-sidebar": false,
-        "settings-search": true,
-        "match-sidebar-width": true,
-        "sidebar-action-grid": true,
-        "sidebar-project-backgrounds": true,
-        "sidebar-conversation-colors": true,
-        "render-markdown-preview-math": true,
-        "slash-menu-polish": true,
-        "hide-usage-alert": true,
-      },
+      defaults: FEATURE_DEFAULTS,
     };
     this._state = state;
-
-    // ── settings page ──────────────────────────────────────────────────
-    // We require `registerPage`. The older `register()` API would render
-    // these toggles as a *nested section* inside Codex++'s built-in
-    // "Tweaks" page — that's misleading, since this tweak is supposed to
-    // own its own sidebar entry. If the runtime is too old we just log
-    // and skip the UI; the features themselves still activate below.
-    if (typeof api.settings?.registerPage !== "function") {
-      api.log.warn(
-        "registerPage unavailable — Codex++ runtime is too old. " +
-          "Restart Codex to pick up the latest preload. Settings UI not mounted.",
-      );
-    } else {
-      this._pageHandle = api.settings.registerPage({
-        id: "main",
-        title: "UI Improvements",
-        description: "Bennett's small quality-of-life tweaks.",
-        iconSvg:
-          '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm inline-block align-middle" aria-hidden="true">' +
-          '<path d="M4 6h12M4 10h8M4 14h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>' +
-          '<circle cx="14" cy="10" r="1.6" fill="currentColor"/>' +
-          "</svg>",
-        render: (root) => renderSettings(root, state),
-      });
-    }
 
     // ── activate features per stored prefs ─────────────────────────────
     for (const id of Object.keys(state.defaults)) {
@@ -181,111 +203,8 @@ module.exports = {
       }
     }
     s.features.clear();
-    this._pageHandle?.unregister();
   },
 };
-
-// ─────────────────────────────────────────────────────────── settings UI ──
-
-/**
- * Render the dedicated page. Mirrors Codex's standard form: one
- * `flex flex-col gap-2` section per group, rounded card with rows.
- */
-function renderSettings(root, state) {
-  const features = [
-    {
-      id: "hide-upgrade-prompts",
-      title: "Hide upgrade prompts",
-      description:
-        'Hide the Plus/Pro plan upgrade pill and Get Plus button, but keep Codex software-update notices visible.',
-    },
-    {
-      id: "show-usage-in-sidebar",
-      title: "Show usage in sidebar (experimental)",
-      description:
-        "Render 5-hour and weekly rate limits where the upgrade button was. Open the rate-limits breakdown (account menu → Rate limits) at least once to seed the values.",
-    },
-    {
-      id: "square-sidebar",
-      title: "Square sidebar corners",
-      description:
-        "Remove the rounded inner corners on the main content panel so it sits flush against the sidebar.",
-    },
-    {
-      id: "settings-search",
-      title: "Settings search",
-      description:
-        "Add a search field above the Settings tabs so sections can be filtered quickly.",
-    },
-    {
-      id: "match-sidebar-width",
-      title: "Match settings sidebar width",
-      description:
-        "Stop the layout jump when opening Settings: the settings sidebar (fixed at 300px) is forced to match the main UI sidebar's current width.",
-    },
-    {
-      id: "sidebar-action-grid",
-      title: "Sidebar action grid",
-      description:
-        "Render New chat, Search, Plugins, and Automations as a compact 2x2 grid of filled buttons.",
-    },
-    {
-      id: "sidebar-project-backgrounds",
-      title: "Sidebar project backgrounds",
-      description:
-        "Add subtle grouped backgrounds behind project rows so adjacent projects are easier to scan.",
-    },
-    {
-      id: "slash-menu-polish",
-      title: "Slash menu polish",
-      description:
-        "Tighten the composer slash menu with denser rows, clearer active state, and calmer section headers.",
-    },
-    {
-      id: "hide-usage-alert",
-      title: "Hide usage exhaustion alerts",
-      description:
-        "Hide Codex usage exhaustion banners and reset prompts.",
-    },
-  ];
-
-  const section = el("section", "flex flex-col gap-2");
-  section.appendChild(sectionTitle("Features"));
-
-  const card = roundedCard();
-  for (const f of features) {
-    card.appendChild(featureRow(state, f));
-  }
-  section.appendChild(card);
-  root.appendChild(section);
-}
-
-function featureRow(state, f) {
-  const row = el("div", "flex items-center justify-between gap-4 p-3");
-
-  const left = el("div", "flex min-w-0 flex-col gap-1");
-  const label = el("div", "min-w-0 text-sm text-token-text-primary");
-  label.textContent = f.title;
-  left.appendChild(label);
-  if (f.description) {
-    const desc = el("div", "text-token-text-secondary min-w-0 text-sm");
-    desc.textContent = f.description;
-    left.appendChild(desc);
-  }
-  row.appendChild(left);
-
-  const initial = readFlag(state.api, f.id, state.defaults[f.id]);
-  const sw = switchControl(initial, async (next) => {
-    writeFlag(state.api, f.id, next);
-    window.dispatchEvent(new CustomEvent("codexpp-ui-improvements-setting-changed", {
-      detail: { id: f.id, value: next },
-    }));
-    if (next) activateFeature(state, f.id);
-    else deactivateFeature(state, f.id);
-  });
-  row.appendChild(sw);
-  return row;
-}
 
 // ─────────────────────────────────────────────────────────── feature reg ──
 
@@ -3979,35 +3898,6 @@ const FEATURES = {
   },
 
   /**
-   * Square sidebar: the visual "rounded sidebar" is actually the main
-   * content panel — `<main class="main-surface ... rounded-s-2xl">` —
-   * which has `border-radius: 12.5px 0 0 12.5px` (TL+BL via Tailwind's
-   * logical `rounded-s-2xl`). Its rounded left edge curves into the
-   * sidebar, making the sidebar's TR+BR corners *appear* rounded.
-   * Flattening `.main-surface`'s left side squares the seam.
-   */
-  "square-sidebar"() {
-    const STYLE_ID = "codexpp-square-sidebar";
-    document.getElementById(STYLE_ID)?.remove();
-
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      /* Flatten the main panel's left (logical-start) corners.
-         Codex applies these via Tailwind's rounded-s-2xl utility. */
-      .main-surface {
-        border-start-start-radius: 0 !important;
-        border-end-start-radius: 0 !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      style.remove();
-    };
-  },
-
-  /**
    * Refine the composer slash menu by lightly annotating the live DOM.
    *
    * Live DOM shape captured via Electron CDP:
@@ -6836,536 +6726,6 @@ const FEATURES = {
   },
 
   /**
-   * Render the four primary sidebar actions as a compact 2x2 grid.
-   *
-   * We keep the native buttons and click handlers intact, hide them, and
-   * render proxy buttons that forward clicks to the originals. This avoids
-   * inheriting the narrow icon-button constraints Codex applies to the
-   * existing action row.
-   */
-  "sidebar-action-grid"(api) {
-    const STYLE_ID = "codexpp-sidebar-action-grid";
-    const ATTR = "data-codexpp-sidebar-action-grid";
-    const WRAPPER_CLASS = "grid grid-cols-2 gap-2 w-full px-row-x";
-    const BUTTON_CLASS =
-      "flex min-w-0 flex-col items-start justify-center gap-1 rounded-lg " +
-      "border border-token-border bg-token-foreground/5 ps-3.5 pe-3.5 py-3 text-left " +
-      "text-sm text-token-text-primary hover:bg-token-foreground/10 " +
-      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 " +
-      "focus-visible:outline-token-border cursor-interaction";
-    const actions = [
-      { key: "new chat", aliases: ["new chat", "quick chat"], label: "New chat" },
-      { key: "search", aliases: ["search"], label: "Search" },
-      { key: "plugins", aliases: ["plugin", "plugins"], label: "Plugins" },
-      { key: "automations", aliases: ["automation", "automations"], label: "Automations" },
-    ];
-
-    document.getElementById(STYLE_ID)?.remove();
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      [${ATTR}="group"] {
-        width: 100% !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-        column-gap: var(--spacing-2, 0.5rem) !important;
-        row-gap: var(--spacing-2, 0.5rem) !important;
-      }
-
-      [${ATTR}="button"] {
-        display: flex !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        min-height: calc(var(--spacing-token-button-composer, 2rem) * 2.15) !important;
-        padding: var(--spacing-3, 0.75rem) var(--spacing-3_5, 0.875rem) !important;
-        color: var(--color-token-text-primary) !important;
-        border: 1px solid color-mix(in srgb, currentColor 14%, transparent) !important;
-        border-radius: var(--radius-lg, 0.5rem) !important;
-        background-color: color-mix(in srgb, currentColor 5%, transparent) !important;
-        align-items: flex-start !important;
-        justify-content: center !important;
-        flex-direction: column !important;
-        text-align: left !important;
-        gap: var(--spacing-1, 0.25rem) !important;
-        overflow: hidden !important;
-      }
-
-      [${ATTR}="button"]:hover {
-        background-color: color-mix(in srgb, currentColor 9%, transparent) !important;
-      }
-
-      [${ATTR}="button"] > * {
-        min-width: 0;
-      }
-
-      [${ATTR}="button"] svg {
-        flex-shrink: 0;
-      }
-
-      [${ATTR}="badge"] {
-        display: inline-flex !important;
-        position: absolute !important;
-        top: var(--spacing-2, 0.5rem) !important;
-        right: var(--spacing-2, 0.5rem) !important;
-        translate: none !important;
-        transform: none !important;
-        pointer-events: none !important;
-      }
-
-      [${ATTR}="label"] {
-        display: block !important;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      [${ATTR}="button"] kbd,
-      [${ATTR}="button"] [class*="shortcut" i] {
-        display: none !important;
-      }
-
-      [${ATTR}="original"] {
-        display: none !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    const marked = new Set();
-    let wrapper = null;
-    let activeOriginals = [];
-
-    const clearStaleNodes = () => {
-      document.querySelectorAll(`[${ATTR}="group"]`).forEach((node) => {
-        if (node.dataset.codexppSidebarActionOwned === "true") {
-          node.remove();
-        }
-      });
-      document.querySelectorAll(`[${ATTR}]`).forEach((node) => {
-        if (node.dataset.codexppSidebarActionOwned === "true") {
-          node.remove();
-          return;
-        }
-        node.removeAttribute(ATTR);
-        if (node.dataset.codexppSidebarActionPrevClass !== undefined) {
-          node.className = node.dataset.codexppSidebarActionPrevClass;
-          delete node.dataset.codexppSidebarActionPrevClass;
-        }
-        if (node.dataset.codexppSidebarActionPrevStyle !== undefined) {
-          node.style.cssText = node.dataset.codexppSidebarActionPrevStyle;
-          delete node.dataset.codexppSidebarActionPrevStyle;
-        }
-      });
-    };
-
-    const cleanupMarks = () => {
-      for (const node of marked) {
-        node.removeAttribute(ATTR);
-        if (node.dataset.codexppSidebarActionPrevClass !== undefined) {
-          node.className = node.dataset.codexppSidebarActionPrevClass;
-          delete node.dataset.codexppSidebarActionPrevClass;
-        }
-        if (node.dataset.codexppSidebarActionPrevStyle !== undefined) {
-          node.style.cssText = node.dataset.codexppSidebarActionPrevStyle;
-          delete node.dataset.codexppSidebarActionPrevStyle;
-        }
-      }
-      marked.clear();
-    };
-
-    const removeWrapper = () => {
-      wrapper?.remove();
-      wrapper = null;
-      activeOriginals = [];
-    };
-
-    const normalize = (value) =>
-      (value || "").replace(/\s+/g, " ").trim().toLowerCase();
-
-    const isShortcutNode = (node) => {
-      if (!(node instanceof HTMLElement)) return false;
-      if (node.tagName === "KBD") return true;
-      const text = normalize(node.textContent || "");
-      const className = String(node.className || "");
-      return (
-        /\bshortcut\b/i.test(className) ||
-        /^[⌘⇧⌥⌃^]*(?:[a-z0-9]|space|enter|tab|esc)$/i.test(text) ||
-        /^(?:ctrl|control|alt|option|shift|cmd|command)\+/.test(text)
-      );
-    };
-
-    const isBadgeNode = (node) => {
-      if (!(node instanceof HTMLElement)) return false;
-      const className = String(node.className || "");
-      return (
-        /\bbadge\b/i.test(className) ||
-        /\bdisambiguated-digits\b/i.test(className) ||
-        (/\babsolute\b/.test(className) && /^\d+$/.test(normalize(node.textContent || "")))
-      );
-    };
-
-    const nodeLabelText = (node) => {
-      if (!(node instanceof HTMLElement)) return "";
-      const childLabels = Array.from(node.children)
-        .filter(
-          (child) =>
-            child instanceof HTMLElement &&
-            !isShortcutNode(child) &&
-            !isBadgeNode(child) &&
-            child.getAttribute(ATTR) !== "badge",
-        )
-        .map((child) => nodeLabelText(child))
-        .filter(Boolean);
-      if (childLabels.length) return childLabels.join(" ");
-      return normalize(node.textContent || "");
-    };
-
-    const buttonLabel = (node) =>
-      normalize(node.getAttribute("aria-label") || nodeLabelText(node))
-        .replace(/\s*(?:[⌘⇧⌥⌃^]|ctrl|control|alt|option|shift|cmd|command)\+?.*$/i, "")
-        .trim();
-
-    const isCompositeActionText = (node) => {
-      const text = normalize(node.textContent || "");
-      let count = 0;
-      for (const action of actions) {
-        if (action.aliases.some((alias) => text.includes(alias))) count += 1;
-      }
-      return count > 1;
-    };
-
-    const findMainSidebar = () => {
-      const aside = document.querySelector(
-        [
-          "aside.pointer-events-auto.relative.flex.overflow-hidden",
-          "aside.pointer-events-auto.relative.flex.overflow-visible",
-          "aside.pointer-events-auto.relative.flex",
-        ].join(", "),
-      );
-      if (aside instanceof HTMLElement) return aside;
-      return null;
-    };
-
-    const findActionButtons = (options = {}) => {
-      const sidebar = findMainSidebar();
-      if (!sidebar) return null;
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const candidates = Array.from(sidebar.querySelectorAll("button, a"))
-        .filter(
-          (node) => {
-            if (!(node instanceof HTMLElement)) return false;
-            if (
-              node.getAttribute(ATTR) === "original" ||
-              node.getAttribute(ATTR) === "source-original" ||
-              node.getAttribute(ATTR) === "overlay" ||
-              isCompositeActionText(node)
-            ) {
-              return false;
-            }
-            const rect = node.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0) return false;
-            return rect.top - sidebarRect.top < 260;
-          },
-        )
-        .sort((a, b) => {
-          const ar = a.getBoundingClientRect();
-          const br = b.getBoundingClientRect();
-          return ar.top - br.top || ar.left - br.left;
-        });
-      const byLabel = new Map();
-      for (const node of candidates) {
-        const label = buttonLabel(node);
-        const action = actions.find((item) => item.aliases.includes(label));
-        if (action && !byLabel.has(action.key)) {
-          byLabel.set(action.key, node);
-        }
-      }
-      if (actions.some((action) => !byLabel.has(action.key))) return null;
-      return actions.map((action) => ({
-        ...action,
-        original: byLabel.get(action.key),
-      }));
-    };
-
-    const commonAncestor = (nodes) => {
-      if (!nodes.length) return null;
-      const chain = [];
-      for (let node = nodes[0]; node; node = node.parentElement) {
-        chain.push(node);
-      }
-      return chain.find((node) => nodes.every((target) => node.contains(target)));
-    };
-
-    const markNode = (node, value) => {
-      if (!marked.has(node)) {
-        if (node.dataset.codexppSidebarActionPrevClass === undefined) {
-          node.dataset.codexppSidebarActionPrevClass = node.className || "";
-        }
-        if (node.dataset.codexppSidebarActionPrevStyle === undefined) {
-          node.dataset.codexppSidebarActionPrevStyle = node.style.cssText || "";
-        }
-        marked.add(node);
-      }
-      if (node.getAttribute(ATTR) !== value) node.setAttribute(ATTR, value);
-    };
-
-    const addClasses = (node, classes) => {
-      const missing = classes.filter((className) => !node.classList.contains(className));
-      if (missing.length) node.classList.add(...missing);
-    };
-
-    const setImportantStyle = (node, property, value) => {
-      if (node.style.getPropertyValue(property) === value &&
-          node.style.getPropertyPriority(property) === "important") {
-        return;
-      }
-      node.style.setProperty(property, value, "important");
-    };
-
-    const findFullWidthMount = (sidebar, originals) => {
-      const common = commonAncestor(originals);
-      if (!(common instanceof HTMLElement)) return sidebar;
-
-      const sidebarWidth = sidebar.getBoundingClientRect().width;
-      let mount = common;
-      while (
-        mount.parentElement &&
-        mount.parentElement !== sidebar &&
-        mount.getBoundingClientRect().width < sidebarWidth * 0.7
-      ) {
-        mount = mount.parentElement;
-      }
-      return mount;
-    };
-
-    const createProxyButton = (action) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `${BUTTON_CLASS.replace(/\bflex\b/g, "").trim()} relative`;
-      btn.setAttribute(ATTR, "button");
-      btn.setAttribute("aria-label", action.label);
-      btn.style.setProperty("display", "block", "important");
-      btn.style.setProperty("width", "100%", "important");
-      btn.style.setProperty("text-align", "left", "important");
-
-      const iconWrap = document.createElement("div");
-      iconWrap.className = "mb-1 h-5 w-5 text-token-text-secondary";
-      iconWrap.style.setProperty("display", "block", "important");
-      iconWrap.style.setProperty("width", "1.25rem", "important");
-      iconWrap.style.setProperty("height", "1.25rem", "important");
-
-      const icon = action.original.querySelector("svg")?.cloneNode(true);
-      if (icon instanceof SVGElement) {
-        icon.classList.add("icon-sm", "shrink-0", "text-token-text-secondary");
-        icon.setAttribute("aria-hidden", "true");
-        icon.removeAttribute("aria-label");
-        icon.style.setProperty("display", "block", "important");
-        iconWrap.appendChild(icon);
-      }
-
-      const text = document.createElement("div");
-      text.setAttribute(ATTR, "label");
-      text.className = "min-w-0 max-w-full truncate leading-tight";
-      text.style.setProperty("display", "block", "important");
-      text.style.setProperty("width", "100%", "important");
-      text.textContent = action.label;
-      btn.append(iconWrap, text);
-
-      btn.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const live = findActionButtons({ includeHiddenSource: true })
-          ?.find((candidate) => candidate.key === action.key)
-          ?.original;
-        activateOriginal(live || action.original);
-      });
-
-      return btn;
-    };
-
-    const activateOriginal = (original) => {
-      if (!(original instanceof HTMLElement)) return;
-      original.click();
-      original.dispatchEvent(
-        new PointerEvent("pointerdown", { bubbles: true, cancelable: true }),
-      );
-      original.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
-      );
-      original.dispatchEvent(
-        new PointerEvent("pointerup", { bubbles: true, cancelable: true }),
-      );
-      original.dispatchEvent(
-        new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
-      );
-      original.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, cancelable: true }),
-      );
-    };
-
-    const sourceHideTarget = (original) => {
-      let node = original;
-      while (
-        node.parentElement &&
-        node.parentElement !== wrapper &&
-        node.parentElement.childElementCount === 1
-      ) {
-        node = node.parentElement;
-      }
-      return node;
-    };
-
-    const hideOriginals = (originals) => {
-      for (const original of originals) {
-        const target = sourceHideTarget(original);
-        markNode(target, "source-original");
-        target.style.setProperty("display", "none", "important");
-      }
-    };
-
-    const stackOriginalButtonContent = (button) => {
-      for (const node of button.querySelectorAll("kbd")) {
-        if (node instanceof HTMLElement) {
-          markNode(node, "shortcut");
-          setImportantStyle(node, "display", "none");
-        }
-      }
-
-      const content =
-        Array.from(button.children).find(
-          (child) =>
-            child instanceof HTMLElement &&
-            child.querySelector("svg") &&
-            normalize(child.textContent || ""),
-        ) || button;
-
-      if (content instanceof HTMLElement) {
-        if (content !== button) markNode(content, "content");
-        setImportantStyle(content, "display", "flex");
-        setImportantStyle(content, "flex-direction", "column");
-        setImportantStyle(content, "align-items", "flex-start");
-        setImportantStyle(content, "justify-content", "center");
-        setImportantStyle(content, "gap", "var(--spacing-1, 0.25rem)");
-        setImportantStyle(content, "width", "100%");
-        setImportantStyle(content, "min-width", "0");
-        setImportantStyle(content, "text-align", "left");
-      }
-
-      const icon = button.querySelector("svg");
-      if (icon instanceof SVGElement) {
-        setImportantStyle(icon, "display", "block");
-        setImportantStyle(icon, "flex-shrink", "0");
-      }
-
-      for (const node of button.querySelectorAll("span, div")) {
-        if (isBadgeNode(node)) {
-          markNode(node, "badge");
-        }
-      }
-    };
-
-    const apply = () => {
-      const sidebar = findMainSidebar();
-      if (!sidebar) return;
-
-      const actionButtons = findActionButtons();
-      if (!actionButtons) {
-        cleanupMarks();
-        return;
-      }
-      const originals = actionButtons.map((action) => action.original);
-
-      const group = commonAncestor(originals);
-      if (!(group instanceof HTMLElement)) return;
-      const groupText = normalize(group.textContent || "");
-      const groupRect = group.getBoundingClientRect();
-      const sidebarRect = sidebar.getBoundingClientRect();
-      if (
-        group.children.length > 8 ||
-        groupRect.top - sidebarRect.top > 260 ||
-        /\bpinned\b|\bprojects?\b/.test(groupText)
-      ) {
-        cleanupMarks();
-        return;
-      }
-
-      markNode(group, "group");
-      addClasses(group, WRAPPER_CLASS.split(/\s+/).filter(Boolean));
-
-      for (const action of actionButtons) {
-        const original = action.original;
-        markNode(original, "button");
-        addClasses(
-          original,
-          BUTTON_CLASS.replace(/\brelative\b/g, "")
-            .split(/\s+/)
-            .filter(Boolean),
-        );
-        setImportantStyle(original, "display", "flex");
-        setImportantStyle(
-          original,
-          "border",
-          "1px solid color-mix(in srgb, currentColor 14%, transparent)",
-        );
-        setImportantStyle(
-          original,
-          "background-color",
-          "color-mix(in srgb, currentColor 5%, transparent)",
-        );
-        setImportantStyle(original, "flex-direction", "column");
-        setImportantStyle(original, "align-items", "flex-start");
-        setImportantStyle(original, "justify-content", "center");
-        stackOriginalButtonContent(original);
-      }
-      activeOriginals = originals;
-    };
-
-    let applyTimer = 0;
-    const scheduleApply = (delay = 120) => {
-      if (applyTimer) window.clearTimeout(applyTimer);
-      applyTimer = window.setTimeout(() => {
-        applyTimer = 0;
-        apply();
-      }, delay);
-    };
-    const mutationsTouchActions = (records) => {
-      if (!activeOriginals.length || activeOriginals.some((node) => !node.isConnected)) {
-        return true;
-      }
-      return records.some((record) => {
-        const target = record.target instanceof Element
-          ? record.target
-          : record.target?.parentElement;
-        if (
-          target instanceof Element &&
-          activeOriginals.some((button) => target === button || target.contains(button) || button.contains(target))
-        ) {
-          return true;
-        }
-        return [...record.addedNodes, ...record.removedNodes].some((node) =>
-          node instanceof Element && activeOriginals.some((button) => node === button || node.contains(button)),
-        );
-      });
-    };
-
-    clearStaleNodes();
-    apply();
-    const obs = new MutationObserver((records) => {
-      if (mutationsTouchActions(records)) scheduleApply();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-
-    api.log.info("sidebar action grid active");
-
-    return () => {
-      obs.disconnect();
-      if (applyTimer) window.clearTimeout(applyTimer);
-      removeWrapper();
-      cleanupMarks();
-      style.remove();
-    };
-  },
-
-  /**
    * Add subtle grouped backgrounds behind project rows in the main sidebar.
    *
    * Codex's sidebar project rows are `div[role="listitem"]` nodes with
@@ -7379,8 +6739,8 @@ const FEATURES = {
   "sidebar-project-backgrounds"(api) {
     const STYLE_ID = "codexpp-sidebar-project-backgrounds";
     const ATTR = "data-codexpp-sidebar-project-backgrounds";
-    const MENU_ATTR = "data-codexpp-sidebar-project-color-menu";
     const COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
+    const NATIVE_COLOR_MENU_ID = "bennett-ui:project-color";
     const ASIDE_SELECTOR = [
       "aside.pointer-events-auto.relative.flex.overflow-hidden",
       "aside.pointer-events-auto.relative.flex.overflow-visible",
@@ -7464,8 +6824,7 @@ const FEATURES = {
     const colorPrefsCacheKey = "__codexppSidebarProjectColorPrefs";
     let colorPrefs = readColorPrefs();
     window[colorPrefsCacheKey] = colorPrefs;
-    let pendingContextMenu = null;
-    let menu = null;
+    const patchedProjectActionHandles = new Map();
     let disposed = false;
 
     document.getElementById(STYLE_ID)?.remove();
@@ -7587,29 +6946,6 @@ const FEATURES = {
         width: calc(100% - 8px) !important;
       }
 
-      [${MENU_ATTR}="root"] {
-        position: fixed;
-        z-index: 2147483647;
-        min-width: 180px;
-        border: 1px solid var(--color-token-border, var(--color-border)) !important;
-        border-radius: var(--radius-lg, 0.5rem);
-        background: var(--color-background-panel, var(--color-token-bg-fog));
-        box-shadow: var(--shadow-lg, 0 10px 24px rgb(0 0 0 / 0.16));
-        padding: var(--spacing-1, 0.25rem);
-      }
-
-      [${MENU_ATTR}="item"] {
-        width: 100%;
-        border-radius: var(--radius-md, 0.375rem);
-      }
-
-      [${MENU_ATTR}="swatch"] {
-        background-color: var(--codexpp-project-menu-color, currentColor);
-      }
-
-      [${MENU_ATTR}="trigger"] {
-        color: var(--color-token-foreground);
-      }
     `;
     document.head.appendChild(style);
 
@@ -7644,11 +6980,34 @@ const FEATURES = {
           "",
       ).replace(/\s*[⌘⇧⌥⌃^].*$/, "");
 
+    const nativeProjectRowFor = (node) => {
+      if (!(node instanceof HTMLElement)) return null;
+      if (node.matches("[data-app-action-sidebar-project-row]")) return node;
+      return node.querySelector("[data-app-action-sidebar-project-row]");
+    };
+
+    const projectLabelFor = (node) => {
+      const nativeRow = nativeProjectRowFor(node);
+      return normalize(
+        nativeRow?.getAttribute("data-app-action-sidebar-project-label") ||
+          node?.getAttribute?.("aria-label") ||
+          nativeRow?.textContent ||
+          node?.textContent ||
+          "",
+      );
+    };
+
     const isProjectRow = (node) => {
       if (!(node instanceof HTMLElement)) return false;
       if (!visible(node)) return false;
-      if (node.getAttribute("role") !== "listitem") return false;
-      if (!node.classList.contains("group/cwd")) return false;
+
+      const nativeRow = nativeProjectRowFor(node);
+      if (nativeRow) {
+        const label = projectLabelFor(node);
+        return Boolean(label && label.length >= 2 && label.length <= 80 && !EXCLUDED_LABELS.has(label));
+      }
+
+      if (node.getAttribute("role") !== "listitem" || !node.classList.contains("group/cwd")) return false;
 
       const text = labelFor(node);
       if (!text || text.length < 2 || text.length > 80) return false;
@@ -7659,7 +7018,11 @@ const FEATURES = {
     };
 
     const candidateRows = (sidebar) =>
-      Array.from(sidebar.querySelectorAll("div[role='listitem'][aria-label]"))
+      Array.from(sidebar.querySelectorAll("[data-app-action-sidebar-project-row], div[role='listitem'][aria-label]"))
+        .map((node) => {
+          if (!node.matches("[data-app-action-sidebar-project-row]")) return node;
+          return node.closest("div[role='listitem'][aria-label]") || node;
+        })
         .filter(isProjectRow)
         .filter((node, index, rows) => rows.indexOf(node) === index);
 
@@ -7710,7 +7073,11 @@ const FEATURES = {
       reconcileProjectLists(rows);
       for (const row of rows) {
         if (!(row instanceof HTMLElement)) continue;
-        const label = labelFor(row);
+        const label = projectLabelFor(row);
+        if (colorPrefs[projectKey(label)] === "none") {
+          clearRowMarks(row);
+          continue;
+        }
         setAttr(row, ATTR, "row");
         setAttr(row, "data-codexpp-sidebar-project-expanded", String(isExpandedProject(row)));
         setStyleVar(row, "--codexpp-project-tint", tintFor(label));
@@ -7719,6 +7086,7 @@ const FEATURES = {
         setOptionalStyleVar(row, "--codexpp-project-link-token-override", linkTokenOverrideFor(label));
         markProjectParts(row, label);
       }
+      patchProjectActionMenus(rows);
     };
 
     const reconcileProjectLists = (rows) => {
@@ -7794,359 +7162,177 @@ const FEATURES = {
         });
     };
 
-    const projectPathForRow = (row) => {
-      const action = row?.querySelector?.("[data-app-action-sidebar-project-id]");
-      const value = action instanceof HTMLElement
-        ? action.getAttribute("data-app-action-sidebar-project-id")
-        : null;
-      return value || null;
+    const reactFiberFor = (node) => {
+      if (!(node instanceof HTMLElement)) return null;
+      const key = Object.keys(node).find((item) => item.startsWith("__reactFiber$"));
+      return key ? node[key] : null;
     };
 
-    const numberOrClient = (value, fallback) =>
-      typeof value === "number" && Number.isFinite(value) ? value : fallback;
-
-    const seedProjectMenu = (label, event, anchor, row) => {
-      const anchorRect = anchor?.getBoundingClientRect?.();
-      pendingContextMenu = {
-        label,
-        projectPath: projectPathForRow(row),
-        x: numberOrClient(event?.clientX, anchorRect?.right ?? anchorRect?.left ?? 0),
-        y: numberOrClient(event?.clientY, anchorRect?.top ?? 0),
-        at: Date.now(),
-      };
-      [0, 50, 150, 350].forEach((delay) =>
-        window.setTimeout(injectColorMenuIntoNativeMenu, delay),
+    const projectActionsHandleFor = (row) => {
+      const button = row.querySelector(
+        "button[aria-haspopup='menu'], [role='button'][aria-haspopup='menu']",
       );
-    };
-
-    const findProjectOverflowButton = (row, label) =>
-      Array.from(row.querySelectorAll("button, [role='button']"))
-        .filter((node) => isProjectOverflowButton(row, label, node))
-        .sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)[0] || null;
-
-    const isProjectOverflowButton = (row, label, button) => {
-      if (!(button instanceof HTMLElement) || !row.contains(button) || !visible(button)) {
-        return false;
+      let fiber = reactFiberFor(button);
+      for (let depth = 0; fiber && depth < 16; depth += 1, fiber = fiber.return) {
+        const handle = fiber.memoizedProps?.ref?.current;
+        if (handle && typeof handle.getContextMenuItems === "function") return handle;
       }
-      if (labelFor(button) === label) return false;
-      const rect = button.getBoundingClientRect();
-      if (rect.width > 52 || rect.height > 52) return false;
-      const text = normalize(button.textContent || "");
-      const aria = normalize(button.getAttribute("aria-label") || "");
-      return (
-        !text ||
-        aria.includes("more") ||
-        aria.includes("menu") ||
-        button.getAttribute("aria-haspopup") === "menu" ||
-        Boolean(button.querySelector("svg"))
+      return null;
+    };
+
+    const nativeMenuMessage = (id, defaultMessage) => ({
+      id: `bennettUi.${id}`,
+      defaultMessage,
+      description: "Bennett UI project color menu",
+    });
+
+    const nativeMenuLabels = () => {
+      const isChinese = /^zh(?:-|$)/i.test(
+        document.documentElement.lang || navigator.language || "",
       );
+      if (!isChinese) {
+        return {
+          title: "Project color",
+          auto: "Auto",
+          none: "No color",
+          blue: "Blue",
+          green: "Green",
+          yellow: "Yellow",
+          red: "Red",
+          pink: "Pink",
+          purple: "Purple",
+          gray: "Gray",
+        };
+      }
+      return {
+        title: "项目着色",
+        auto: "自动",
+        none: "无颜色",
+        blue: "蓝色",
+        green: "绿色",
+        yellow: "黄色",
+        red: "红色",
+        pink: "粉色",
+        purple: "紫色",
+        gray: "灰色",
+      };
     };
 
-    const onProjectOverflowTrigger = (event) => {
-      const button = event.target?.closest?.("button, [role='button']");
-      if (!(button instanceof HTMLElement)) return;
-      const row = button.closest("div[role='listitem'][aria-label]");
-      if (!isProjectRow(row)) return;
-      const label = labelFor(row);
-      if (!isProjectOverflowButton(row, label, button)) return;
-      seedProjectMenu(label, event, button, row);
+    const NATIVE_SWATCH_COLORS = Object.freeze({
+      blue: "#0285ff",
+      green: "#04b84c",
+      yellow: "#ffc300",
+      red: "#fa423e",
+      pink: "#ff66ad",
+      purple: "#924ff7",
+      gray: "#8e8e93",
+    });
+
+    const nativeColorSwatchIcon = (colorId) => {
+      if (colorId === "none") {
+        const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="6.25" stroke="#8e8e93" stroke-width="1.5"/><path d="M5.6 14.4 14.4 5.6" stroke="#8e8e93" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+      }
+      const fill = NATIVE_SWATCH_COLORS[colorId];
+      const gradient = colorId === "auto"
+        ? `<defs><linearGradient id="g" x1="3" y1="3" x2="17" y2="17" gradientUnits="userSpaceOnUse"><stop stop-color="#0285ff"/><stop offset=".34" stop-color="#04b84c"/><stop offset=".67" stop-color="#ffc300"/><stop offset="1" stop-color="#fa423e"/></linearGradient></defs>`
+        : "";
+      const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">${gradient}<circle cx="10" cy="10" r="6.25" fill="${fill || "url(#g)"}"/><circle cx="10" cy="10" r="6.25" stroke="#808080" stroke-opacity=".42"/></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     };
 
-    const onProjectContextMenu = (event) => {
-      const row = event.target?.closest?.("div[role='listitem'][aria-label]");
-      if (!isProjectRow(row)) return;
-      seedProjectMenu(labelFor(row), event, row, row);
-    };
-
-    const openColorMenu = (label, x, y, anchor) => {
-      closeMenu();
-      const selected = colorPrefs[projectKey(label)] || "auto";
-      menu = document.createElement("div");
-      menu.setAttribute(MENU_ATTR, "root");
-      menu.className = "flex flex-col gap-0.5";
-
-      const title = document.createElement("div");
-      title.className = "px-2 py-1 text-xs text-token-text-secondary";
-      title.textContent = "Project color";
-      menu.appendChild(title);
-
-      const options = [
-        { id: "auto", label: "Auto", value: "var(--color-token-text-secondary)" },
-        ...PALETTE,
-      ];
-      for (const option of options) {
-        const item = document.createElement("button");
-        item.type = "button";
-        item.setAttribute(MENU_ATTR, "item");
-        item.setAttribute("data-color-id", option.id);
-        item.className =
-          "flex h-token-button-composer items-center gap-2 px-2 text-left text-sm " +
-          "text-token-text-primary hover:bg-token-foreground/10 cursor-interaction";
-        item.setAttribute("aria-pressed", String(selected === option.id));
-
-        const swatch = document.createElement("span");
-        swatch.setAttribute(MENU_ATTR, "swatch");
-        swatch.className = "size-3 shrink-0 rounded-full border border-token-border";
-        swatch.style.setProperty("--codexpp-project-menu-color", option.value);
-
-        const text = document.createElement("span");
-        text.className = "min-w-0 flex-1 truncate";
-        text.textContent = option.label;
-
-        const check = document.createElement("span");
-        check.setAttribute(MENU_ATTR, "check");
-        check.className = "text-token-text-secondary";
-        check.textContent = selected === option.id ? "✓" : "";
-
-        item.append(swatch, text, check);
-        item.addEventListener("click", async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (option.id === "auto") delete colorPrefs[projectKey(label)];
-          else colorPrefs[projectKey(label)] = option.id;
-          applyColorToCurrentRows(label);
-          syncNativeMenuChecks(label);
-          try {
-            await writeColorPrefs();
-          } catch (e) {
-            api.log.warn("sidebar project color write failed", e);
-          }
-          applyColorToCurrentRows(label);
-          closeMenu();
-          scheduleApply();
+    const setProjectColor = (label, colorId) => {
+      if (colorId === "auto") delete colorPrefs[projectKey(label)];
+      else colorPrefs[projectKey(label)] = colorId;
+      applyColorToCurrentRows(label);
+      try {
+        Promise.resolve(writeColorPrefs()).catch((e) => {
+          api.log.warn("sidebar project color write failed", e);
         });
-        menu.appendChild(item);
+      } catch (e) {
+        api.log.warn("sidebar project color write failed", e);
       }
-
-      document.body.appendChild(menu);
-      const rect = menu.getBoundingClientRect();
-      const anchorRect = anchor?.getBoundingClientRect?.();
-      const left = anchorRect ? anchorRect.right + 4 : x;
-      const top = anchorRect ? anchorRect.top : y;
-      menu.style.left = `${Math.max(8, Math.min(left, window.innerWidth - rect.width - 8))}px`;
-      menu.style.top = `${Math.max(8, Math.min(top, window.innerHeight - rect.height - 8))}px`;
-
-      window.setTimeout(() => {
-        document.addEventListener("pointerdown", closeMenuOnOutside, true);
-        document.addEventListener("keydown", closeMenuOnKey, true);
-      }, 0);
+      applyColorToCurrentRows(label);
+      scheduleApply();
     };
 
-    function closeMenu() {
-      document.removeEventListener("pointerdown", closeMenuOnOutside, true);
-      document.removeEventListener("keydown", closeMenuOnKey, true);
-      menu?.remove();
-      menu = null;
-    }
-
-    function closeMenuOnOutside(event) {
-      if (menu?.contains(event.target)) return;
-      closeMenu();
-    }
-
-    function closeMenuOnKey(event) {
-      if (event.key === "Escape") closeMenu();
-    }
-
-    const injectColorMenuIntoNativeMenu = () => {
-      if (!pendingContextMenu || Date.now() - pendingContextMenu.at > 1500) return;
-      const nativeMenu = findNativeContextMenu(pendingContextMenu.x, pendingContextMenu.y);
-      if (!nativeMenu || nativeMenu.querySelector(`[${MENU_ATTR}="trigger"]`)) return;
-
-      const nativeItem = nativeMenu.querySelector('[role="menuitem"]');
-      const copyPathItem = createNativeMenuItem({
-        nativeItem,
-        attr: "copy-path",
-        label: "Copy folder path",
-        icon: copyPathIcon(),
-        onActivate: async (event) => {
-          event?.preventDefault?.();
-          event?.stopPropagation?.();
-          const projectPath = pendingContextMenu?.projectPath;
-          if (!projectPath) return;
-          try {
-            await copyText(projectPath);
-          } catch (e) {
-            api.log.warn("copy project path failed", e);
-          }
-          nativeMenu.remove();
-        },
-      });
-
-      const trigger = document.createElement("div");
-      trigger.setAttribute("role", "menuitem");
-      trigger.setAttribute("tabindex", "-1");
-      trigger.setAttribute("data-orientation", "vertical");
-      trigger.setAttribute(MENU_ATTR, "trigger");
-      trigger.className =
-        nativeItem instanceof HTMLElement && nativeItem.className
-          ? nativeItem.className
-          : "text-token-foreground outline-hidden rounded-lg px-[var(--padding-row-x)] " +
-            "py-[var(--padding-row-y)] text-sm electron:text-base flex w-full items-center " +
-            "group hover:bg-token-list-hover-background focus:bg-token-list-hover-background " +
-            "cursor-interaction";
-      trigger.classList.remove("w-full", "items-center", "gap-2");
-      trigger.classList.add("flex", "flex-col");
-
-      const row = document.createElement("div");
-      row.className = "flex w-full items-center gap-1.5";
-
-      const label = document.createElement("span");
-      label.className = "flex-1 min-w-0 truncate";
-      label.textContent = "Project color";
-
-      const chevron = document.createElement("span");
-      chevron.className = "text-token-text-secondary";
-      chevron.textContent = "›";
-
-      row.append(projectColorIcon(), label, chevron);
-      trigger.appendChild(row);
-      const open = (event) => {
-        event?.preventDefault?.();
-        event?.stopPropagation?.();
-        openColorMenu(pendingContextMenu.label, pendingContextMenu.x, pendingContextMenu.y, trigger);
-      };
-      trigger.addEventListener("pointerenter", open);
-      trigger.addEventListener("focus", open);
-      trigger.addEventListener("click", open);
-      const removeItem = findRemoveMenuItem(nativeMenu);
-      nativeMenu.insertBefore(copyPathItem, removeItem);
-      nativeMenu.insertBefore(trigger, removeItem);
-    };
-
-    const createNativeMenuItem = ({ nativeItem, attr, label, icon, onActivate }) => {
-      const item = document.createElement("div");
-      item.setAttribute("role", "menuitem");
-      item.setAttribute("tabindex", "-1");
-      item.setAttribute("data-orientation", "vertical");
-      item.setAttribute(MENU_ATTR, attr);
-      item.className =
-        nativeItem instanceof HTMLElement && nativeItem.className
-          ? nativeItem.className
-          : "text-token-foreground outline-hidden rounded-lg px-[var(--padding-row-x)] " +
-            "py-[var(--padding-row-y)] text-sm electron:text-base flex flex-col " +
-            "group hover:bg-token-list-hover-background focus:bg-token-list-hover-background " +
-            "cursor-interaction";
-      item.classList.remove("w-full", "items-center", "gap-2");
-      item.classList.add("flex", "flex-col");
-
-      const row = document.createElement("div");
-      row.className = "flex w-full items-center gap-1.5";
-
-      const text = document.createElement("span");
-      text.className = "flex-1 min-w-0 truncate";
-      text.textContent = label;
-
-      row.append(icon, text);
-      item.appendChild(row);
-      item.addEventListener("click", onActivate);
-      return item;
-    };
-
-    const copyText = async (text) => {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return;
-      }
-      const input = document.createElement("textarea");
-      input.value = text;
-      input.setAttribute("readonly", "");
-      input.style.cssText = "position:fixed;left:-9999px;top:-9999px;";
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      input.remove();
-    };
-
-    const copyPathIcon = () => {
-      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon.setAttribute("width", "20");
-      icon.setAttribute("height", "20");
-      icon.setAttribute("viewBox", "0 0 20 20");
-      icon.setAttribute("fill", "none");
-      icon.setAttribute("aria-hidden", "true");
-      icon.classList.add(
-        "icon-xs",
-        "shrink-0",
-        "opacity-75",
-        "group-focus:opacity-100",
-        "group-hover:opacity-100",
-      );
-
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute(
-        "d",
-        "M7.5 5.5V4.75C7.5 3.78 8.28 3 9.25 3H14C14.97 3 15.75 3.78 15.75 4.75V11.5C15.75 12.47 14.97 13.25 14 13.25H13.25M6 6.75H10.75C11.72 6.75 12.5 7.53 12.5 8.5V15.25C12.5 16.22 11.72 17 10.75 17H6C5.03 17 4.25 16.22 4.25 15.25V8.5C4.25 7.53 5.03 6.75 6 6.75Z",
-      );
-      path.setAttribute("stroke", "currentColor");
-      path.setAttribute("stroke-width", "1.35");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-      icon.appendChild(path);
-      return icon;
-    };
-
-    const projectColorIcon = () => {
-      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      icon.setAttribute("width", "16");
-      icon.setAttribute("height", "16");
-      icon.setAttribute("viewBox", "0 0 16 16");
-      icon.setAttribute("fill", "none");
-      icon.setAttribute("aria-hidden", "true");
-      icon.classList.add(
-        "icon-xs",
-        "shrink-0",
-        "opacity-75",
-        "group-focus:opacity-100",
-        "group-hover:opacity-100",
-      );
-
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute(
-        "d",
-        "M8 2.25C4.82 2.25 2.25 4.59 2.25 7.47C2.25 10.16 4.34 12.08 6.86 12.08H7.7C8.22 12.08 8.59 12.58 8.44 13.08C8.27 13.67 8.7 14.25 9.31 14.25C11.83 14.25 13.75 11.61 13.75 8.18C13.75 4.91 11.17 2.25 8 2.25Z M5.05 7.25H5.06 M6.4 5.05H6.41 M9.05 4.85H9.06 M10.95 7.05H10.96",
-      );
-      path.setAttribute("stroke", "currentColor");
-      path.setAttribute("stroke-width", "1.45");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-      icon.appendChild(path);
-      return icon;
-    };
-
-    const findRemoveMenuItem = (nativeMenu) =>
-      Array.from(nativeMenu.querySelectorAll('[role="menuitem"]')).find((item) => {
-        const text = normalize(item.textContent || "");
-        return text === "remove" || text === "delete" || text.includes("remove from");
-      }) || null;
-
-    const findNativeContextMenu = (x, y) => {
-      const menus = Array.from(document.querySelectorAll('[role="menu"][data-state="open"]'))
-        .filter((node) => node instanceof HTMLElement && !node.hasAttribute(MENU_ATTR));
-      return menus
-        .map((node) => ({ node, rect: node.getBoundingClientRect() }))
-        .filter(({ rect }) => rect.width > 0 && rect.height > 0)
-        .sort((a, b) => {
-          const da = Math.abs(a.rect.left - x) + Math.abs(a.rect.top - y);
-          const db = Math.abs(b.rect.left - x) + Math.abs(b.rect.top - y);
-          return da - db;
-        })[0]?.node || null;
-    };
-
-    const syncNativeMenuChecks = (label) => {
+    const appendProjectColorSubmenu = (items, label) => {
+      if (!Array.isArray(items)) return items;
+      if (items.some((item) => item?.id === NATIVE_COLOR_MENU_ID)) return items;
+      const labels = nativeMenuLabels();
       const selected = colorPrefs[projectKey(label)] || "auto";
-      menu?.querySelectorAll(`[${MENU_ATTR}="item"]`).forEach((item) => {
-        const id = item.getAttribute("data-color-id");
-        item.setAttribute("aria-pressed", String(id === selected));
-        const check = item.querySelector(`[${MENU_ATTR}="check"]`);
-        if (check) check.textContent = id === selected ? "✓" : "";
-      });
+      const options = ["auto", "none", ...PALETTE.map(({ id }) => id)];
+      const submenu = options.map((colorId) => ({
+        id: `${NATIVE_COLOR_MENU_ID}:${colorId}`,
+        message: nativeMenuMessage(`projectColor.${colorId}`, labels[colorId]),
+        icon: nativeColorSwatchIcon(colorId),
+        checked: selected === colorId,
+        onSelect: () => setProjectColor(label, colorId),
+      }));
+      const item = {
+        id: NATIVE_COLOR_MENU_ID,
+        message: nativeMenuMessage("projectColor", labels.title),
+        icon: nativeColorSwatchIcon("auto"),
+        submenu,
+      };
+      const next = [...items];
+      const destructiveIndex = next.findIndex((entry) =>
+        /(?:remove|delete).*(?:project|workspace|folder)|(?:project|workspace|folder).*(?:remove|delete)/i
+          .test(String(entry?.id || "")),
+      );
+      const insertAt = destructiveIndex > 0 && next[destructiveIndex - 1]?.type === "separator"
+        ? destructiveIndex - 1
+        : destructiveIndex >= 0
+          ? destructiveIndex
+          : next.length;
+      next.splice(insertAt, 0, item);
+      return next;
+    };
+
+    const restoreProjectActionHandle = (handle, record) => {
+      if (handle?.getContextMenuItems === record.wrapped) {
+        handle.getContextMenuItems = record.original;
+      }
+      patchedProjectActionHandles.delete(handle);
+    };
+
+    const patchProjectActionMenus = (rows) => {
+      const activeHandles = new Set();
+      for (const row of rows) {
+        const handle = projectActionsHandleFor(row);
+        if (!handle) continue;
+        activeHandles.add(handle);
+        const label = projectLabelFor(row);
+        let record = patchedProjectActionHandles.get(handle);
+        if (record && handle.getContextMenuItems === record.wrapped) {
+          record.label = label;
+          continue;
+        }
+        if (record) patchedProjectActionHandles.delete(handle);
+        const original = handle.getContextMenuItems;
+        record = { label, original, wrapped: null };
+        record.wrapped = function bennettProjectColorMenuItems(...args) {
+          const items = record.original.apply(this, args);
+          return appendProjectColorSubmenu(items, record.label);
+        };
+        try {
+          handle.getContextMenuItems = record.wrapped;
+          if (handle.getContextMenuItems === record.wrapped) {
+            patchedProjectActionHandles.set(handle, record);
+          }
+        } catch (e) {
+          api.log.warn("project color native menu hook unavailable", e);
+        }
+      }
+      for (const [handle, record] of patchedProjectActionHandles) {
+        if (!activeHandles.has(handle)) restoreProjectActionHandle(handle, record);
+      }
     };
 
     const applyColorToCurrentRows = (label) => {
       const sidebar = mainSidebar();
       if (!sidebar) return;
-      const rows = candidateRows(sidebar).filter((row) => labelFor(row) === projectKey(label));
+      const rows = candidateRows(sidebar).filter((row) => projectLabelFor(row) === projectKey(label));
       markRows(rows);
     };
 
@@ -8162,7 +7348,7 @@ const FEATURES = {
       rows = rows.filter((node, index) => rows.indexOf(node) === index);
       const seenLabels = new Set();
       rows = rows.filter((node) => {
-        const label = labelFor(node);
+        const label = projectLabelFor(node);
         if (!label || seenLabels.has(label)) return false;
         seenLabels.add(label);
         return true;
@@ -8177,7 +7363,7 @@ const FEATURES = {
         apply._lastCount = rows.length;
         api.log.info("sidebar project backgrounds marked rows", {
           count: rows.length,
-          labels: rows.slice(0, 8).map(labelFor),
+          labels: rows.slice(0, 8).map(projectLabelFor),
         });
       }
     };
@@ -8275,9 +7461,6 @@ const FEATURES = {
       childList: true,
       subtree: true,
     });
-    document.addEventListener("contextmenu", onProjectContextMenu, true);
-    document.addEventListener("pointerdown", onProjectOverflowTrigger, true);
-    document.addEventListener("click", onProjectOverflowTrigger, true);
     const onWindowFocus = () => scheduleApply();
     const onVisibilityChange = () => scheduleApply();
     window.addEventListener("focus", onWindowFocus);
@@ -8290,12 +7473,11 @@ const FEATURES = {
       observer.disconnect();
       if (scheduleTimer) window.clearTimeout(scheduleTimer);
       retryTimers.forEach((timer) => window.clearTimeout(timer));
-      document.removeEventListener("contextmenu", onProjectContextMenu, true);
-      document.removeEventListener("pointerdown", onProjectOverflowTrigger, true);
-      document.removeEventListener("click", onProjectOverflowTrigger, true);
       window.removeEventListener("focus", onWindowFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      closeMenu();
+      for (const [handle, record] of patchedProjectActionHandles) {
+        restoreProjectActionHandle(handle, record);
+      }
       clearMarks();
       style.remove();
     };
@@ -8553,11 +7735,14 @@ const FEATURES = {
 
     colorPrefs = readColorPrefs();
 
+    const storedColorFor = (info) =>
+      colorPrefs[normalize(info.label)] || (info.id && colorPrefs[`id:${normalize(info.id)}`]);
+
     const paletteFor = (info) => {
       const palette = Array.isArray(window[PALETTE_CACHE_KEY]) && window[PALETTE_CACHE_KEY].length
         ? window[PALETTE_CACHE_KEY]
         : PALETTE_FALLBACK;
-      const storedId = colorPrefs[normalize(info.label)] || (info.id && colorPrefs[`id:${normalize(info.id)}`]);
+      const storedId = storedColorFor(info);
       const selected = palette.find((item) => item.id === storedId);
       if (selected) return selected;
       const seed = normalize(info.label || info.id);
@@ -8582,6 +7767,10 @@ const FEATURES = {
         if (!(thread instanceof HTMLElement) || !visible(thread)) continue;
         const info = projectForThread(thread, index);
         if (!info) {
+          clearRow(thread);
+          continue;
+        }
+        if (storedColorFor(info) === "none") {
           clearRow(thread);
           continue;
         }
@@ -8648,225 +7837,6 @@ const FEATURES = {
 
 // ─────────────────────────────────────────────────────────────── helpers ──
 
-// ── main services ─────────────────────────────────────────────────────────
-const USAGE_GLOBAL_KEY = "__bennettUiImprovementsUsageService";
-const USAGE_HANDLER_KEY = "__bennettUiImprovementsUsageHandler";
-const SLASH_MENU_SHORTCUT_BRIDGE_KEY =
-  "__bennettUiImprovementsSlashMenuShortcutBridge";
-
-function startMainUsageProvider(api) {
-  const service = createUsageService(api);
-  globalThis[USAGE_GLOBAL_KEY] = service;
-
-  if (!globalThis[USAGE_HANDLER_KEY]) {
-    api.ipc.handle("usage-fetch", (_url = "/wham/usage") => {
-      const active = globalThis[USAGE_GLOBAL_KEY];
-      return active?.fetchUsage?.() || null;
-    });
-    globalThis[USAGE_HANDLER_KEY] = true;
-  }
-
-  api.log.info("[usage] main provider active");
-}
-
-function startMainSlashMenuShortcutBridge(api) {
-  const { app, webContents } = require("electron");
-  const state =
-    globalThis[SLASH_MENU_SHORTCUT_BRIDGE_KEY] || {
-      attached: new WeakSet(),
-      listenerRegistered: false,
-    };
-  globalThis[SLASH_MENU_SHORTCUT_BRIDGE_KEY] = state;
-
-  state.attach = (wc) => {
-    if (!wc || wc.isDestroyed?.() || state.attached.has(wc)) return;
-    state.attached.add(wc);
-    wc.on("before-input-event", (event, input = {}) => {
-      const digit = slashMenuShortcutDigit(input);
-      if (!digit) return;
-      const url = wc.getURL?.() || "";
-      if (!url.startsWith("app://") && !url.includes("codex")) return;
-      event.preventDefault();
-      wc.executeJavaScript(dispatchSlashMenuShortcutScript(digit), true).catch(() => {});
-    });
-  };
-
-  for (const wc of webContents.getAllWebContents()) state.attach(wc);
-
-  if (!state.listenerRegistered) {
-    app.on("web-contents-created", (_event, wc) => {
-      globalThis[SLASH_MENU_SHORTCUT_BRIDGE_KEY]?.attach?.(wc);
-    });
-    state.listenerRegistered = true;
-  }
-
-  api.log.info("[slash-menu-polish] main shortcut bridge active");
-}
-
-function slashMenuShortcutDigit(input = {}) {
-  if (input.type !== "keyDown" && input.type !== "rawKeyDown") return 0;
-  if (!(input.meta || input.control || input.command) || input.alt || input.shift) return 0;
-  const key = String(input.key || input.keyCode || "");
-  if (/^[1-9]$/.test(key)) return Number(key);
-  const code = String(input.code || "");
-  const match = /^(?:Digit|Numpad)([1-9])$/.exec(code);
-  return match ? Number(match[1]) : 0;
-}
-
-function dispatchSlashMenuShortcutScript(digit) {
-  return `
-    (() => {
-      const digit = ${Number(digit) || 0};
-      const activeMenu = () =>
-        Array.from(document.querySelectorAll('[data-codexpp-slash-menu="true"]')).find(
-          (menu) =>
-            menu instanceof HTMLElement &&
-            menu.isConnected &&
-            menu.querySelector(".vertical-scroll-fade-mask"),
-        );
-      const menu = activeMenu();
-      const scroller = menu?.querySelector(".vertical-scroll-fade-mask");
-      const before = scroller instanceof HTMLElement ? scroller.scrollTop : null;
-      const shortcutEvent = new CustomEvent("codexpp-slash-section-shortcut", {
-        detail: { digit },
-        cancelable: true,
-      });
-      window.dispatchEvent(shortcutEvent);
-
-      window.setTimeout(() => {
-        const currentMenu = activeMenu();
-        const currentScroller = currentMenu?.querySelector(".vertical-scroll-fade-mask");
-        if (!(currentScroller instanceof HTMLElement)) return;
-        if (before !== null && Math.abs(currentScroller.scrollTop - before) > 1) return;
-        const sections = Array.from(currentScroller.children).filter(
-          (node) =>
-            node instanceof HTMLElement &&
-            node.getAttribute("data-codexpp-slash-section") &&
-            node.getAttribute("data-codexpp-slash-section-empty") !== "true" &&
-            node.querySelector('[data-list-navigation-item="true"]'),
-        );
-        const target = sections[digit - 1];
-        if (!(target instanceof HTMLElement)) return;
-        const rawTop =
-          currentScroller.scrollTop +
-          target.getBoundingClientRect().top -
-          currentScroller.getBoundingClientRect().top;
-        const adjustedTop =
-          digit > 1
-            ? Math.min(rawTop + 1, currentScroller.scrollHeight - currentScroller.clientHeight)
-            : rawTop;
-        currentMenu.setAttribute("data-codexpp-slash-input-mode", "keyboard");
-        currentMenu.setAttribute("data-codexpp-slash-programmatic-scroll", "true");
-        currentMenu.setAttribute("data-codexpp-slash-hover-suppressed", "true");
-        currentScroller.scrollLeft = 0;
-        currentScroller.scrollTo({
-          top: Math.max(
-            0,
-            Math.min(adjustedTop, currentScroller.scrollHeight - currentScroller.clientHeight),
-          ),
-          behavior: "smooth",
-        });
-        window.setTimeout(
-          () => currentMenu.removeAttribute("data-codexpp-slash-programmatic-scroll"),
-          320,
-        );
-      }, 120);
-
-      return shortcutEvent.defaultPrevented;
-    })()
-  `;
-}
-
-function createUsageService(api) {
-  let cache = { at: 0, value: null };
-  const TTL_MS = 10_000;
-
-  return {
-    async fetchUsage() {
-      const now = Date.now();
-      if (cache.value && now - cache.at < TTL_MS) return cache.value;
-      const value = await fetchUsageInCodexWebview();
-      cache = { at: Date.now(), value };
-      return value;
-    },
-  };
-
-  async function fetchUsageInCodexWebview() {
-    const { webContents } = require("electron");
-    const candidates = webContents
-      .getAllWebContents()
-      .filter((wc) => {
-        const url = wc.getURL();
-        return !wc.isDestroyed() && (url.startsWith("app://") || url.includes("codex"));
-      });
-
-    let lastError = null;
-    for (const wc of candidates) {
-      try {
-        return await wc.executeJavaScript(usageFetchScript(), true);
-      } catch (e) {
-        lastError = e;
-      }
-    }
-    throw lastError || new Error("no Codex webview available for usage fetch");
-  }
-
-  function usageFetchScript() {
-    return `(() => new Promise((resolve, reject) => {
-      const bridge = window.electronBridge;
-      if (typeof bridge?.sendMessageFromView !== "function") {
-        reject(new Error("electronBridge unavailable"));
-        return;
-      }
-      const hostId = new URL(window.location.href).searchParams.get("hostId")?.trim() || "local";
-      const requestId = "codexpp-main-usage-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-      let done = false;
-      const cleanup = () => {
-        done = true;
-        window.removeEventListener("message", onMessage);
-        window.clearTimeout(timer);
-      };
-      const finish = (fn, value) => {
-        if (done) return;
-        cleanup();
-        fn(value);
-      };
-      const onMessage = (event) => {
-        const data = event.data;
-        if (!data || typeof data !== "object" || data.type !== "fetch-response" || data.requestId !== requestId) return;
-        if (data.responseType === "success") {
-          try {
-            const body = JSON.parse(data.bodyJsonString);
-            if (data.status >= 200 && data.status < 300) finish(resolve, body);
-            else finish(reject, new Error("HTTP " + data.status));
-          } catch (error) {
-            finish(reject, error);
-          }
-        } else {
-          finish(reject, new Error(data.error || "fetch failed"));
-        }
-      };
-      const timer = window.setTimeout(() => {
-        bridge.sendMessageFromView({ type: "cancel-fetch", requestId }).catch(() => {});
-        finish(reject, new Error("usage request timed out"));
-      }, 10000);
-      window.addEventListener("message", onMessage);
-      bridge.sendMessageFromView({
-        type: "fetch",
-        hostId,
-        requestId,
-        method: "GET",
-        url: "/wham/usage",
-      }).catch((error) => finish(reject, error));
-    }))();`;
-  }
-}
-
-function readSnapshot(api) {
-  const v = api.storage.get("usage:snapshot", null);
-  if (!v || typeof v !== "object") return null;
-  return v;
-}
 function writeSnapshot(api, snap) {
   api.storage.set("usage:snapshot", snap);
 }
@@ -9055,77 +8025,6 @@ function writeFlag(api, id, on) {
   api.storage.set(`feature:${id}`, !!on);
 }
 
-function el(tag, className) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  return node;
-}
-
-function sectionTitle(text) {
-  const titleRow = el(
-    "div",
-    "flex h-toolbar items-center justify-between gap-2 px-0 py-0",
-  );
-  const inner = el("div", "flex min-w-0 flex-1 flex-col gap-1");
-  const t = el("div", "text-base font-medium text-token-text-primary");
-  t.textContent = text;
-  inner.appendChild(t);
-  titleRow.appendChild(inner);
-  return titleRow;
-}
-
-function roundedCard() {
-  const card = el(
-    "div",
-    "border-token-border flex flex-col divide-y-[0.5px] divide-token-border rounded-lg border",
-  );
-  card.style.backgroundColor =
-    "var(--color-background-panel, var(--color-token-bg-fog))";
-  return card;
-}
-
-/** Codex-native toggle (lifted verbatim from tweaks/AGENTS.md §4). */
-function switchControl(initial, onChange) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.setAttribute("role", "switch");
-  const pill = document.createElement("span");
-  const knob = document.createElement("span");
-  knob.className =
-    "rounded-full border border-[color:var(--gray-0)] bg-[color:var(--gray-0)] " +
-    "shadow-sm transition-transform duration-200 ease-out h-4 w-4";
-  pill.appendChild(knob);
-  const apply = (on) => {
-    btn.setAttribute("aria-checked", String(on));
-    btn.dataset.state = on ? "checked" : "unchecked";
-    btn.className =
-      "inline-flex items-center text-sm focus-visible:outline-none focus-visible:ring-2 " +
-      "focus-visible:ring-token-focus-border focus-visible:rounded-full cursor-interaction";
-    pill.className =
-      "relative inline-flex shrink-0 items-center rounded-full transition-colors " +
-      "duration-200 ease-out h-5 w-8 " +
-      (on ? "bg-token-charts-blue" : "bg-token-foreground/20");
-    pill.dataset.state = on ? "checked" : "unchecked";
-    knob.dataset.state = on ? "checked" : "unchecked";
-    knob.style.transform = on ? "translateX(14px)" : "translateX(2px)";
-  };
-  apply(initial);
-  btn.appendChild(pill);
-  btn.addEventListener("click", async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = btn.getAttribute("aria-checked") !== "true";
-    apply(next);
-    btn.disabled = true;
-    try {
-      await onChange?.(next);
-    } finally {
-      btn.disabled = false;
-    }
-  });
-  return btn;
-}
-
   const tweak = module.exports;
   const api = createBigPizzaRendererApi();
   if (!tweak || typeof tweak.start !== "function") {
@@ -9133,98 +8032,8 @@ function switchControl(initial, onChange) {
   }
 
   tweak.start.call(tweak, api);
-  const features = [
-    "hide-upgrade-prompts",
-    "show-usage-in-sidebar",
-    "square-sidebar",
-    "settings-search",
-    "match-sidebar-width",
-    "sidebar-action-grid",
-    "sidebar-project-backgrounds",
-    "sidebar-conversation-colors",
-    "render-markdown-preview-math",
-    "slash-menu-polish",
-    "hide-usage-alert",
-  ];
-  const featureInfo = [
-    {
-      id: "hide-upgrade-prompts",
-      title: "隐藏升级提示",
-      detail: "隐藏 Plus/Pro 套餐升级提示，但保留 Codex 软件更新提示。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "show-usage-in-sidebar",
-      title: "5 小时 / 周 / Credit 额度",
-      detail: "优先通过 Codex renderer fetch bridge 读取 /wham/usage；默认显示 5h，点击可切换 Weekly；只有实际收到点数数据时才显示 Credit，API 模式显示 API。",
-      defaultEnabled: true,
-      status: "当前页面暴露额度信号时可用",
-    },
-    {
-      id: "hide-usage-alert",
-      title: "隐藏额度耗尽提示",
-      detail: "隐藏额度用完后的弹窗、重置提示和额度卡片。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "square-sidebar",
-      title: "侧栏方角",
-      detail: "去掉侧栏与主内容之间的圆角。",
-      defaultEnabled: false,
-      status: "可用",
-    },
-    {
-      id: "settings-search",
-      title: "设置搜索",
-      detail: "给 Codex 设置页增加搜索框。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "match-sidebar-width",
-      title: "匹配设置页侧栏宽度",
-      detail: "让设置页侧栏宽度与主侧栏对齐。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "sidebar-action-grid",
-      title: "侧栏动作网格",
-      detail: "把主要侧栏动作整理成紧凑网格。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "sidebar-project-backgrounds",
-      title: "项目背景和颜色",
-      detail: "为项目行增加分组背景，并保留旧的项目颜色偏好。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "sidebar-conversation-colors",
-      title: "会话项目着色",
-      detail: "让会话行继承所属项目的颜色；无法识别项目的会话保持默认样式。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-    {
-      id: "render-markdown-preview-math",
-      title: "Markdown 预览增强",
-      detail: "在右侧 .md 文件预览中渲染 LaTeX、数学表格和图片；相对图片路径以当前文档为基准，点击内容可原位编辑源码。",
-      defaultEnabled: true,
-      status: "支持 $…$、$$…$$、\\(…\\) 和 \\[…\\]",
-    },
-    {
-      id: "slash-menu-polish",
-      title: "斜杠菜单优化",
-      detail: "压缩斜杠菜单行距，并强化选中状态。",
-      defaultEnabled: true,
-      status: "可用",
-    },
-  ];
+  const features = FEATURE_IDS;
+  const featureInfo = FEATURE_DEFINITIONS;
   let settingsScanTimer = 0;
   const scheduleSettingsPanelInstall = () => {
     if (settingsScanTimer) return;
@@ -9609,10 +8418,7 @@ function switchControl(initial, onChange) {
     };
 
     return {
-      process: "renderer",
       storage,
-      settings: null,
-      fs: null,
       log: {
         debug: logWith("debug"),
         info: logWith("info"),
@@ -9625,7 +8431,6 @@ function switchControl(initial, onChange) {
             new Error(`BigPizza Codex++ user scripts do not expose b-nnett IPC channel: ${channel}`),
           );
         },
-        handle: noop,
       },
     };
   }
@@ -9641,6 +8446,7 @@ function switchControl(initial, onChange) {
  * pin/archive state, and sidebar rendering.
  */
 (() => {
+  try {
   const DEFAULT_TARGET = 500;
   const MIN_TARGET = 1;
   const MAX_TARGET = 2000;
@@ -9914,6 +8720,40 @@ function switchControl(initial, onChange) {
 
   window.__bennettUiEmbeddedHistoryLoader = window[SCRIPT_KEY];
   scheduleScriptLoadHistoryRefresh();
+  } catch (error) {
+    const message = error?.message || String(error);
+    const readFallbackLimit = () => {
+      try {
+        const parsed = Number.parseInt(localStorage.getItem("__codexListPagebusterTarget") || "500", 10);
+        return Number.isFinite(parsed) ? Math.max(1, Math.min(2000, parsed)) : 500;
+      } catch {
+        return 500;
+      }
+    };
+    const failedLoader = {
+      embeddedBy: "bennett-ui-improvements",
+      refresh: () => Promise.reject(new Error(message)),
+      getLimit: readFallbackLimit,
+      setLimit: readFallbackLimit,
+      stop() {},
+      status: () => ({
+        configuredLimit: readFallbackLimit(),
+        lastRequestedLimit: 0,
+        refreshAttempts: 0,
+        lastRefreshAt: 0,
+        lastRefreshError: message,
+        startupAttempts: 0,
+        startupCompleted: false,
+        renderer: "codex-native",
+        operation: "refresh-recent-conversations-for-host",
+        degraded: true,
+        href: location.href,
+      }),
+    };
+    window.__codexListPagebuster = failedLoader;
+    window.__bennettUiEmbeddedHistoryLoader = failedLoader;
+    console.warn("[Bennett history limit] initialization failed", error);
+  }
 })();
 
 /* END BENNETT EMBEDDED NATIVE HISTORY LOADER */

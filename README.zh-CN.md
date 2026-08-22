@@ -4,7 +4,7 @@
 
 **专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.2.5-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.3.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -21,7 +21,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 
 | 领域 | 提供的能力 |
 | --- | --- |
-| 侧栏 | 项目和会话颜色、紧凑动作网格、可选方角和斜杠菜单优化。 |
+| 侧栏 | 项目和会话颜色、项目颜色控制和斜杠菜单优化。 |
 | 额度 | 真实的 5 小时与 Weekly 额度、可选 Credit、重置时间提示和明确的 `API` 模式。 |
 | 历史会话 | 将 Codex 原生近期会话查询上限由默认 50 条提高到可配置的 1–2000 条，不接管会话管理。 |
 | Markdown | KaTeX 公式、数学表格、图片、相对图片路径和公式源码查看。 |
@@ -60,12 +60,12 @@ Bennett UI 从 1.2.1 起已经内置原生会话加载器，**不需要**再单�
 | Markdown 预览增强 | 开启 | 对 `.md` 和 `.markdown` 预览稳定可用 |
 | 设置搜索 | 开启 | 稳定 |
 | 匹配设置页侧栏宽度 | 开启 | 稳定 |
-| 紧凑侧栏动作网格 | 开启 | 稳定 |
 | 斜杠菜单优化 | 开启 | 稳定 |
 | 原生会话查询上限 | 自动 | 每次启动请求；可设置 1–2000 条并手动重试 |
-| 侧栏方角 | 关闭 | 稳定 |
 
 所有功能开关和会话加载入口都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。
+
+项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 
 ## 会话项目着色
 

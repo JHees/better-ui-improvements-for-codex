@@ -18,8 +18,9 @@ Original tweak id:
 co.bennett.ui-improvements
 ```
 
-The original implementation is MIT licensed. The source snapshot used for this
-migration is kept under `old-bennett-ui/` so the provenance is visible.
+The original implementation is MIT licensed. Its provenance remains recorded
+in this notice and in repository history; redundant source snapshots are not
+kept in the current working tree.
 
 The migration work adapts storage, settings, lifecycle, and DOM mounting logic
 for the BigPizzaV3 Codex++ renderer-only user-script runtime. It does not claim

@@ -4,7 +4,7 @@
 
 **A focused UI and workflow upgrade for BigPizzaV3 Codex++.**
 
-[![Version](https://img.shields.io/badge/version-1.2.5-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.3.0-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -21,7 +21,7 @@ This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nne
 
 | Area | What it adds |
 | --- | --- |
-| Sidebar | Project and conversation colors, compact action grid, optional square corners, and slash-menu polish. |
+| Sidebar | Project and conversation colors, project-color controls, and slash-menu polish. |
 | Usage | Real 5-hour and weekly quota data, optional Credit view, reset-time tooltips, and explicit `API` mode. |
 | History | Raise Codex's native recent-history query limit from 50 to a configurable 1–2000 without taking over conversation management. |
 | Markdown | KaTeX formulas, math tables, images, relative image paths, and source inspection in `.md` previews. |
@@ -60,12 +60,12 @@ Enable the script in Codex++ and reload user scripts. A full Codex restart is no
 | Enhanced Markdown preview | On | Stable for `.md` and `.markdown` previews |
 | Settings search | On | Stable |
 | Match settings-sidebar width | On | Stable |
-| Compact sidebar action grid | On | Stable |
 | Slash-menu polish | On | Stable |
 | Native history query limit | Automatic | Requested once at startup; configurable from 1 to 2000 with manual retry |
-| Square sidebar corners | Off | Stable |
 
 Feature switches and the history loader are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads.
+
+Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
 ## Conversation project colors
 
