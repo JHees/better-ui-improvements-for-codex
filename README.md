@@ -4,7 +4,7 @@
 
 **A focused UI and workflow upgrade for BigPizzaV3 Codex++.**
 
-[![Version](https://img.shields.io/badge/version-1.4.1-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.3-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,7 +13,7 @@
 
 </div>
 
-Bennett UI Improvements is a renderer-only user script for [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus). It brings project-aware sidebar styling, reliable quota display, an enhanced Markdown preview, native thread export and permanent deletion, a native-history query-limit control, and a dedicated settings panel into one installable script.
+Bennett UI Improvements 1.4.3 is a renderer-only plugin for Codex Script Loader, with a legacy Codex++ compatibility path. It brings project-aware sidebar styling, reliable quota display, an enhanced Markdown preview, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) to the BigPizzaV3 user-script runtime while preserving the original authorship and MIT license notices. The migration is maintained by [JHees](https://github.com/JHees).
 
@@ -23,10 +23,10 @@ This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nne
 | --- | --- |
 | Sidebar | Project and conversation colors, project-color controls, and slash-menu polish. |
 | Usage | Real 5-hour and weekly quota data, optional Credit view, reset-time tooltips, and explicit `API` mode. |
-| History | Raise Codex's native recent-history query limit from 50 to a configurable 1–2000 without taking over conversation management. |
+| History | Leaves ordinary and project conversations to Codex's native, independently scoped pagination. |
 | Markdown | KaTeX formulas, math tables, images, relative image paths, and source inspection in `.md` previews. |
 | Thread actions | Adds Markdown export and confirmed permanent deletion to Codex's built-in thread menu while leaving native project movement in place. |
-| Settings | A dedicated Bennett UI panel with per-feature switches and a native-history load control. |
+| Settings | A dedicated Bennett UI panel with per-feature switches. |
 | Noise reduction | Hides Codex quota-exhaustion and Plus/Pro upgrade prompts while keeping the composer and app-update notices visible. |
 
 ## Install
@@ -36,8 +36,6 @@ This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nne
 1. Open **Codex++ Management Tools**.
 2. Find and install **Bennett UI Improvements**.
 3. Enable the script and select **Reload user scripts**.
-
-The native history loader has been bundled into Bennett UI since 1.2.1. You do **not** need to install Codex List Pagebuster separately.
 
 ### Manual installation
 
@@ -64,11 +62,10 @@ Enable the script in Codex++ and reload user scripts. A full Codex restart is no
 | Slash-menu polish | On | Stable |
 | Thread Markdown export | On | Local non-ephemeral threads; uses the native Codex App Server |
 | Thread permanent deletion | On | Local non-ephemeral threads; irreversible and explicitly confirmed |
-| Native history query limit | Automatic | Requested once at startup; configurable from 1 to 2000 with manual retry |
 
-Feature switches and the history loader are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads.
+Feature switches are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads. Version 1.4.3 also migrates and mirrors project-color choices between the legacy Codex++ and Script Loader storage namespaces.
 
-Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
+Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. Explicit choices are bound to the stable project ID when Codex exposes one, with the project name retained as a compatibility fallback. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
 Conversation colors require Codex's stable project ID. A working-directory name shown in an ordinary chat is not treated as project membership.
 
@@ -88,18 +85,14 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 - Turn the feature on or off from **Codex++ Management Tools → Bennett UI Settings**. Project color choices continue to apply automatically.
 - Changing a project color updates currently visible conversation rows immediately.
 
-## Native history query limit
+## Native conversation pagination
 
-Bennett UI lets Codex show more of its own recent conversations without replacing Codex's conversation management.
+Current Codex builds own conversation discovery, grouping, and pagination. Bennett no longer calls private history-refresh modules or exposes a separate history limit.
 
-- Choose a limit from **1–2000**; the default is **500** instead of Codex's usual 50.
-- The list refreshes automatically when Codex opens.
-- Use **Reload history** in Bennett UI Settings whenever you want to refresh it manually.
-- Codex and CC Switch continue to manage unified history, project grouping, ordering, and **Show more** behavior.
-
-If a standalone Pagebuster installation is still enabled, both scripts use the same global entry point and hand off to a single active instance. Once Bennett UI is working, the standalone Pagebuster script can be removed.
-
-When CC Switch unified session history is enabled, CC Switch/Codex still own the merge. Bennett neither reads session files nor creates a second conversation database.
+- **Recents** uses Codex's projectless infinite-scroll scope.
+- Every project uses its own project-scoped catalog and loads older conversations independently when the project is expanded.
+- Pinned conversations remain in Codex's separate pinned container.
+- When CC Switch unified session history is enabled, CC Switch/Codex still own the merge. Bennett neither reads session files nor creates a second conversation database.
 
 ## Usage-data behavior
 
