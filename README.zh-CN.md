@@ -4,7 +4,7 @@
 
 **专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.5-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.8-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,7 +13,7 @@
 
 </div>
 
-Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 renderer-only 用户脚本。它将项目化侧栏、真实额度显示、Markdown 预览增强、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 renderer-only 用户脚本。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
 本项目将 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移到 BigPizzaV3 用户脚本运行时，并保留原作者与 MIT 许可证声明。迁移版本由 [JHees](https://github.com/JHees) 维护。
 
@@ -25,7 +25,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 | 额度 | 真实的 5 小时与 Weekly 额度、可选 Credit、重置时间提示和明确的 `API` 模式。 |
 | 历史会话 | 普通会话和项目会话都交由 Codex 原生的独立分页范围管理。 |
 | Markdown | 为 `.md` 预览补充 KaTeX 公式与本地/相对图片，表格、链接和排版继续使用 Codex 原生能力。 |
-| 会话操作 | 在 Codex 自带会话右键菜单中增加 Markdown 导出和确认式永久删除，同时保留原生项目移动。 |
+| 会话操作 | 在 Codex 自带会话右键菜单中增加压缩上下文标题重新生成、Markdown 导出和确认式永久删除，同时保留原生项目移动。 |
 | 设置 | 独立 Bennett UI 设置页，集中管理功能开关。 |
 | 降低干扰 | 隐藏 Codex 额度耗尽提示和 Plus/Pro 升级提示，同时保留输入框和 Codex 软件更新提示。 |
 
@@ -58,10 +58,11 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 | 隐藏 Plus/Pro 升级提示 | 开启 | 稳定；保留 Codex 软件更新提示 |
 | 公式与本地图片预览 | 开启 | 对 `.md` 和 `.markdown` 预览稳定可用；不接管原生表格 |
 | 斜杠菜单优化 | 开启 | 稳定 |
+| 会话标题重新生成 | 开启 | 本地非临时会话；在临时分支压缩完整上下文后使用 Luna low |
 | 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
 | 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 
-所有功能开关都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.5 继续移除已由当前 Codex 原生提供的设置搜索和设置侧栏宽度适配，并将 Markdown 表格、链接和排版交回 Codex 原生预览；项目颜色偏好仍会在旧版 Codex++ 与 Script Loader 两个存储命名空间之间迁移和同步。
+所有功能开关都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.8 使用 system 来源的临时工作分支，并只接受本次新增且已完成的原生压缩 turn，避免旧压缩记录导致 Luna 过早启动。插件会按临时分支 ID 将它从 App 默认会话列表隐藏；若系统管理视图仍显示它，则标题为“正在生成标题（原标题）”。标题任务现在复用 Codex 原生可交互提示窗：文案更短、注明对应会话、可点击关闭，并由原生组件处理并发堆叠。插件会在 Codex 桌面通知监听器执行前，仅把精确匹配临时分支 ID 的完成事件标记为仍有后续，从而复用 App 自带的通知屏蔽判定，不会改变正常会话的系统通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好仍会在旧版 Codex++ 与 Script Loader 两个存储命名空间之间迁移和同步。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。Codex 提供稳定项目 ID 时，手动选择会优先绑定该 ID，并保留项目名称作为兼容回退。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 
@@ -70,10 +71,11 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 ## 原生会话右键操作
 
 - **移动到项目**和**移出项目**继续使用 Codex 原生实现，Bennett 不重复添加或替换。
+- **重新生成标题**会创建 system 来源的临时工作分支，在该分支上触发 Codex 原生压缩，再让 `gpt-5.6-luna` low 在同一压缩上下文中生成结构化标题；结束后永久删除工作分支，原会话不会被压缩或追加消息。
 - **导出 Markdown**位于原生分享和复制操作附近，按时间顺序导出用户与助手文本，并保留本地图片路径标记；系统/开发者上下文、推理和工具载荷不会写入文件。
 - **永久删除**位于菜单最底部并使用危险操作样式，必须明确确认；它调用 Codex 原生 `thread/delete`，不提供 Bennett 或 Codex++ 备份与撤销。
-- 两项功能各有独立开关。任一功能启用时，会隐藏 Codex++ 旧的行内“更多/删除”按钮，但不会影响 Codex 原生的置顶和归档按钮。
-- 两项功能直接调用本地 Codex App Server，不依赖 Codex++ 会话删除 bridge 或 helper 服务。
+- 三项功能各有独立开关。任一功能启用时，会隐藏 Codex++ 旧的行内“更多/删除”按钮，但不会影响 Codex 原生的置顶和归档按钮。
+- 三项功能直接调用本地 Codex App Server，不依赖 Codex++ 会话删除 bridge 或 helper 服务。
 
 ## 会话项目着色
 

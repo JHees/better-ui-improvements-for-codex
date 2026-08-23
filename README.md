@@ -4,7 +4,7 @@
 
 **A focused UI and workflow upgrade for BigPizzaV3 Codex++.**
 
-[![Version](https://img.shields.io/badge/version-1.4.5-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.8-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,7 +13,7 @@
 
 </div>
 
-Bennett UI Improvements 1.4.5 is a renderer-only plugin for Codex Script Loader, with a legacy Codex++ compatibility path. It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Bennett UI Improvements 1.4.8 is a renderer-only plugin for Codex Script Loader, with a legacy Codex++ compatibility path. It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) to the BigPizzaV3 user-script runtime while preserving the original authorship and MIT license notices. The migration is maintained by [JHees](https://github.com/JHees).
 
@@ -25,7 +25,7 @@ This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nne
 | Usage | Real 5-hour and weekly quota data, optional Credit view, reset-time tooltips, and explicit `API` mode. |
 | History | Leaves ordinary and project conversations to Codex's native, independently scoped pagination. |
 | Markdown | Adds KaTeX formulas and local/relative images to `.md` previews while leaving tables, links, and layout to Codex. |
-| Thread actions | Adds Markdown export and confirmed permanent deletion to Codex's built-in thread menu while leaving native project movement in place. |
+| Thread actions | Adds compacted-context title regeneration, Markdown export, and confirmed permanent deletion to Codex's built-in thread menu while leaving native project movement in place. |
 | Settings | A dedicated Bennett UI panel with per-feature switches. |
 | Noise reduction | Hides Codex quota-exhaustion and Plus/Pro upgrade prompts while keeping the composer and app-update notices visible. |
 
@@ -58,10 +58,11 @@ Enable the script in Codex++ and reload user scripts. A full Codex restart is no
 | Hide Plus/Pro upgrade prompts | On | Stable; Codex app-update notices remain visible |
 | Formula and local-image preview | On | Stable for `.md` and `.markdown` previews; native tables are untouched |
 | Slash-menu polish | On | Stable |
+| Thread title regeneration | On | Local non-ephemeral threads; compacts a temporary fork before using Luna low |
 | Thread Markdown export | On | Local non-ephemeral threads; uses the native Codex App Server |
 | Thread permanent deletion | On | Local non-ephemeral threads; irreversible and explicitly confirmed |
 
-Feature switches are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads. Version 1.4.5 keeps the former settings-search and settings-sidebar-width tweaks removed because current Codex builds provide both natively, and returns Markdown tables, links, and layout to Codex's native preview. Project-color choices continue to migrate between the legacy Codex++ and Script Loader storage namespaces.
+Feature switches are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads. Version 1.4.8 uses a system-scoped temporary working fork and waits for a newly completed native compaction turn, so pre-existing compaction history cannot trigger Luna too early. The plugin hides that fork from the App's default thread list by its temporary thread ID; if a system-management view still exposes it, its name is `Generating title (original title)`. Title work now uses Codex's native interactive toast, with compact per-chat labels, a close button, and native concurrent stacking. An exact temporary-thread guard marks only its completion events as pending continuation before Codex's desktop-notification listener runs, reusing the App's own suppression predicate without changing normal-chat notifications. Markdown tables, links, and layout remain delegated to Codex's native preview, and project-color choices continue to migrate between the legacy Codex++ and Script Loader storage namespaces.
 
 Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. Explicit choices are bound to the stable project ID when Codex exposes one, with the project name retained as a compatibility fallback. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
@@ -70,9 +71,10 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 ## Native thread context actions
 
 - **Move to project** and **Remove from project** remain Codex-native operations. Bennett does not duplicate or replace them.
+- **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks `gpt-5.6-luna` low for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
 - **Export Markdown** appears beside Codex's sharing and copy actions. It exports chronological user and assistant text plus local-image path markers, while excluding system/developer context, reasoning, and tool payloads.
 - **Delete permanently** appears at the bottom as a danger action. It requires an explicit confirmation and uses Codex's native `thread/delete`; there is no Bennett or Codex++ backup/undo path.
-- Both additions have independent switches. When either is active, obsolete Codex++ inline More/Delete buttons are hidden without affecting Codex's Pin or Archive controls.
+- All three additions have independent switches. When any is active, obsolete Codex++ inline More/Delete buttons are hidden without affecting Codex's Pin or Archive controls.
 - These actions call the local Codex App Server directly and do not require the Codex++ session-delete bridge or helper service.
 
 ## Conversation project colors
