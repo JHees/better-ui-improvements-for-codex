@@ -4,7 +4,7 @@
 
 **专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.8-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.9-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -62,7 +62,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 | 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
 | 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 
-所有功能开关都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.8 使用 system 来源的临时工作分支，并只接受本次新增且已完成的原生压缩 turn，避免旧压缩记录导致 Luna 过早启动。插件会按临时分支 ID 将它从 App 默认会话列表隐藏；若系统管理视图仍显示它，则标题为“正在生成标题（原标题）”。标题任务现在复用 Codex 原生可交互提示窗：文案更短、注明对应会话、可点击关闭，并由原生组件处理并发堆叠。插件会在 Codex 桌面通知监听器执行前，仅把精确匹配临时分支 ID 的完成事件标记为仍有后续，从而复用 App 自带的通知屏蔽判定，不会改变正常会话的系统通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好仍会在旧版 Codex++ 与 Script Loader 两个存储命名空间之间迁移和同步。
+所有功能开关都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.9 会让已经包装过的原生会话菜单在后续侧栏扫描中仍可识别，避免菜单 Hook 被反复还原和重新挂载，从而使“重新生成标题”选项稳定显示。标题生成使用 system 来源的临时工作分支，并只接受本次新增且已完成的原生压缩 turn，避免旧压缩记录导致 Luna 过早启动。插件会按临时分支 ID 将它从 App 默认会话列表隐藏；若系统管理视图仍显示它，则标题为“正在生成标题（原标题）”。标题任务复用 Codex 原生可交互提示窗：文案更短、注明对应会话、可点击关闭，并由原生组件处理并发堆叠。插件会在 Codex 桌面通知监听器执行前，仅把精确匹配临时分支 ID 的完成事件标记为仍有后续，从而复用 App 自带的通知屏蔽判定，不会改变正常会话的系统通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好仍会在旧版 Codex++ 与 Script Loader 两个存储命名空间之间迁移和同步。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。Codex 提供稳定项目 ID 时，手动选择会优先绑定该 ID，并保留项目名称作为兼容回退。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 
