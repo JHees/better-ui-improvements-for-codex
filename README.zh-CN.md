@@ -1,21 +1,24 @@
 <div align="center">
 
-# Bennett UI Improvements for Codex++
+# Better UI Improvements for Codex
 
-**专为 BigPizzaV3 Codex++ 打造的界面与工作流增强脚本。**
+**通过 Codex Script Loader 持续维护的 Bennett UI 界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.9-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.10-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
+[![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
 
 [English](README.md) · **简体中文**
 
 </div>
 
-Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/BigPizzaV3/CodexPlusPlus) 的 renderer-only 用户脚本。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Bennett UI Improvements 1.4.10 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-本项目将 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移到 BigPizzaV3 用户脚本运行时，并保留原作者与 MIT 许可证声明。迁移版本由 [JHees](https://github.com/JHees) 维护。
+本项目最初由 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移而来，保留原作者与 MIT 许可证声明；现在由 [JHees](https://github.com/JHees) 面向 Codex Script Loader 继续维护。
+
+> [!IMPORTANT]
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的 Bennett 版本。`1.2.4` 之后的版本（包括当前 `1.4.10`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -31,21 +34,15 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 
 ## 安装
 
-### 通过 Codex++ Script Market
+### 通过 Codex Script Loader
 
-1. 打开 **Codex++ 管理工具**。
-2. 搜索并安装 **Bennett UI Improvements**。
-3. 启用脚本，然后点击 **重新加载用户脚本**。
+[Codex Script Loader](https://github.com/JHees/codex-script-loader) 已内置本插件，首次运行时会把它安装到 Loader 的脚本注册表。安装 Loader 并通过它启动 Codex 后，即可使用 Loader 管理的 Bennett UI 包。
 
-### 手动安装
+开发时，本仓库的 [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) 是唯一事实来源，Loader 内置包由该文件同步生成。
 
-将 [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) 复制到：
+### 旧版 Codex++ 安装
 
-```text
-%APPDATA%\Codex++\user_scripts\
-```
-
-在 Codex++ 管理工具中启用脚本并重新加载用户脚本。通常不需要重启 Codex。
+Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停止支持，也不会再从本仓库获得更新。请勿把更新版本安装到 Codex++，也不要把新版本提交到其 Script Market。
 
 ## 功能清单
 
@@ -62,7 +59,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 | 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
 | 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 
-所有功能开关都位于 **Codex++ 管理工具 → Bennett UI 设置**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.9 会让已经包装过的原生会话菜单在后续侧栏扫描中仍可识别，避免菜单 Hook 被反复还原和重新挂载，从而使“重新生成标题”选项稳定显示。标题生成使用 system 来源的临时工作分支，并只接受本次新增且已完成的原生压缩 turn，避免旧压缩记录导致 Luna 过早启动。插件会按临时分支 ID 将它从 App 默认会话列表隐藏；若系统管理视图仍显示它，则标题为“正在生成标题（原标题）”。标题任务复用 Codex 原生可交互提示窗：文案更短、注明对应会话、可点击关闭，并由原生组件处理并发堆叠。插件会在 Codex 桌面通知监听器执行前，仅把精确匹配临时分支 ID 的完成事件标记为仍有后续，从而复用 App 自带的通知屏蔽判定，不会改变正常会话的系统通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好仍会在旧版 Codex++ 与 Script Loader 两个存储命名空间之间迁移和同步。
+所有功能开关都位于 **Codex 设置 → Script-Loader → 界面增强**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.10 通过 Script Loader 提供插件声明的设置页，并复用当前 Codex 设置页的布局、字体、卡片、控件和滚动容器。标题生成继续使用 system 来源的临时工作分支，只接受本次新增且已完成的原生压缩 turn，并只屏蔽精确匹配临时分支的完成通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好会从旧版 Codex++ 存储命名空间迁移到 Script Loader 命名空间。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。Codex 提供稳定项目 ID 时，手动选择会优先绑定该 ID，并保留项目名称作为兼容回退。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 
@@ -82,7 +79,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 - 普通侧栏、展开的项目列表以及有限筛选结果中的会话，会继承所属项目的颜色。
 - 使用低对比度背景和左侧色条，保持标题、选中状态和未读提示清晰可读。
 - 无法确认项目归属的会话保持 Codex 默认样式。
-- 可在 **Codex++ 管理工具 → Bennett UI 设置** 中单独开启或关闭；项目颜色设置会自动同步到会话。
+- 可在 **Codex 设置 → Script-Loader → 界面增强** 中单独开启或关闭；项目颜色设置会自动同步到会话。
 - 修改项目颜色后，当前已显示的会话颜色会立即同步更新。
 
 ## Codex 原生会话分页
@@ -108,7 +105,7 @@ Bennett UI Improvements 是适用于 [BigPizzaV3 Codex++](https://github.com/Big
 
 - 隐藏 Codex 额度耗尽提示和升级提示，同时保留会话正文、输入框及软件更新提示。
 - 支持 Codex 主界面和内嵌 ChatGPT 页面中的相关提示。
-- 可在 **Codex++ 管理工具 → Bennett UI 设置** 中启用或关闭。
+- 可在 **Codex 设置 → Script-Loader → 界面增强** 中启用或关闭。
 
 ## Markdown 预览增强
 
@@ -125,7 +122,7 @@ Markdown 表格、链接、换行和列宽继续由 Codex 原生预览负责。`
 
 ## 兼容性
 
-Bennett UI 以 Codex++ 用户脚本运行，不会修改 Codex 官方安装文件。Codex 大版本更新后，依赖界面的功能可能需要适配；出现异常时，首先尝试重新加载用户脚本。
+Bennett UI 通过 Codex Script Loader 运行，不会修改 Codex 官方安装文件。Codex 大版本更新后，依赖界面的功能可能需要适配。Codex++ `1.2.4` 仅作为历史上的最后受支持版本保留；当前兼容性工作只面向 Codex Script Loader。
 
 ## 可选附加脚本
 
@@ -134,8 +131,8 @@ Bennett UI 以 Codex++ 用户脚本运行，不会修改 Codex 官方安装文�
 ## 来源与许可
 
 - 原始项目：[b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui)
-- 目标运行时：[BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)
-- 脚本市场：[BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
-- 迁移维护仓库：[JHees/bennett-ui-improvements-for-codexplusplus](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+- 当前运行时：[JHees/codex-script-loader](https://github.com/JHees/codex-script-loader)
+- Codex++ 市场历史版本（`1.2.4`）：[BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
+- 当前维护仓库：[JHees/better-ui-improvements-for-codex](https://github.com/JHees/better-ui-improvements-for-codex)
 
 项目使用 [MIT License](LICENSE)。原始版权、来源与许可声明保留在发布脚本和 [`NOTICE.md`](NOTICE.md) 中。

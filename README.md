@@ -1,21 +1,24 @@
 <div align="center">
 
-# Bennett UI Improvements for Codex++
+# Better UI Improvements for Codex
 
-**A focused UI and workflow upgrade for BigPizzaV3 Codex++.**
+**Bennett UI, maintained for Codex through Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.9-14b8a6)](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+[![Version](https://img.shields.io/badge/version-1.4.10-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Runtime](https://img.shields.io/badge/runtime-Codex%2B%2B-111827)](https://github.com/BigPizzaV3/CodexPlusPlus)
+[![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
 
 **English** · [简体中文](README.zh-CN.md)
 
 </div>
 
-Bennett UI Improvements 1.4.9 is a renderer-only plugin for Codex Script Loader, with a legacy Codex++ compatibility path. It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Bennett UI Improvements 1.4.10 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) to the BigPizzaV3 user-script runtime while preserving the original authorship and MIT license notices. The migration is maintained by [JHees](https://github.com/JHees).
+This project began as an adaptation of [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui). It preserves the original authorship and MIT license notices and is now maintained by [JHees](https://github.com/JHees) for Codex Script Loader.
+
+> [!IMPORTANT]
+> **Codex++ support ended with version `1.2.4`.** That is the final Bennett version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.10`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -31,21 +34,15 @@ This project adapts [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nne
 
 ## Install
 
-### Codex++ Script Market
+### Codex Script Loader
 
-1. Open **Codex++ Management Tools**.
-2. Find and install **Bennett UI Improvements**.
-3. Enable the script and select **Reload user scripts**.
+The plugin is bundled with [Codex Script Loader](https://github.com/JHees/codex-script-loader) and is installed into the Loader's script registry on first run. Install and launch Codex through the Loader; Bennett UI is enabled from the Loader-managed script package.
 
-### Manual installation
+For development, this repository's [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) is the source of truth. The Loader package is synchronized from that file.
 
-Copy [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) to:
+### Legacy Codex++ installations
 
-```text
-%APPDATA%\Codex++\user_scripts\
-```
-
-Enable the script in Codex++ and reload user scripts. A full Codex restart is normally unnecessary.
+Codex++ users may continue using the market's frozen `1.2.4` build, but it is unsupported and will not receive updates from this repository. Do not install a newer repository build into Codex++ and do not submit newer releases to its Script Market.
 
 ## Features
 
@@ -62,7 +59,7 @@ Enable the script in Codex++ and reload user scripts. A full Codex restart is no
 | Thread Markdown export | On | Local non-ephemeral threads; uses the native Codex App Server |
 | Thread permanent deletion | On | Local non-ephemeral threads; irreversible and explicitly confirmed |
 
-Feature switches are available under **Codex++ Management Tools → Bennett UI Settings**. Preferences are stored locally and survive script reloads. Version 1.4.9 keeps an already wrapped native thread menu discoverable across sidebar scans, so the regenerate-title action no longer disappears when the menu hook is temporarily restored and reattached. Title regeneration uses a system-scoped temporary working fork and waits for a newly completed native compaction turn, so pre-existing compaction history cannot trigger Luna too early. The plugin hides that fork from the App's default thread list by its temporary thread ID; if a system-management view still exposes it, its name is `Generating title (original title)`. Title work uses Codex's native interactive toast, with compact per-chat labels, a close button, and native concurrent stacking. An exact temporary-thread guard marks only its completion events as pending continuation before Codex's desktop-notification listener runs, reusing the App's own suppression predicate without changing normal-chat notifications. Markdown tables, links, and layout remain delegated to Codex's native preview, and project-color choices continue to migrate between the legacy Codex++ and Script Loader storage namespaces.
+Feature switches are available under **Codex Settings → Script-Loader → Interface enhancements**. Preferences are stored locally and survive script reloads. Version 1.4.10 exposes the plugin-defined settings page through Script Loader and adopts the current Codex settings layout, typography, cards, controls, and scroll surface. Title regeneration keeps its system-scoped temporary working fork, waits for a newly completed native compaction turn, and suppresses only the matching temporary-thread notification. Markdown tables, links, and layout remain delegated to Codex's native preview, and project-color choices continue to migrate from the legacy Codex++ storage namespace to the Script Loader namespace.
 
 Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. Explicit choices are bound to the stable project ID when Codex exposes one, with the project name retained as a compatibility fallback. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
@@ -82,7 +79,7 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 - Conversation rows inherit the color of their project in the normal sidebar, expanded project lists, and limited-filter results.
 - The display uses a subtle background and a colored leading edge so titles, selected rows, and unread indicators remain easy to read.
 - Conversations without a known project keep Codex's default appearance.
-- Turn the feature on or off from **Codex++ Management Tools → Bennett UI Settings**. Project color choices continue to apply automatically.
+- Turn the feature on or off from **Codex Settings → Script-Loader → Interface enhancements**. Project color choices continue to apply automatically.
 - Changing a project color updates currently visible conversation rows immediately.
 
 ## Native conversation pagination
@@ -108,7 +105,7 @@ Current Codex builds own conversation discovery, grouping, and pagination. Benne
 
 - Hides Codex quota-exhaustion notices and upgrade prompts while keeping conversation content, the composer, and app-update notices visible.
 - Works in both the main Codex interface and embedded ChatGPT views.
-- Enable or disable it from **Codex++ Management Tools → Bennett UI Settings**.
+- Enable or disable it from **Codex Settings → Script-Loader → Interface enhancements**.
 
 ## Markdown preview
 
@@ -125,7 +122,7 @@ Markdown tables, links, wrapping, and column sizing remain Codex-native. Currenc
 
 ## Compatibility
 
-Bennett UI runs as a Codex++ user script and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases. If something looks wrong, reload the user scripts first.
+Bennett UI runs through Codex Script Loader and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases. Codex++ `1.2.4` is retained only as the historical final supported build; active compatibility work is limited to Codex Script Loader.
 
 ## Optional companion script
 
@@ -134,8 +131,8 @@ Bennett UI runs as a Codex++ user script and does not modify the official Codex 
 ## Credits and license
 
 - Original project: [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui)
-- Target runtime: [BigPizzaV3/CodexPlusPlus](https://github.com/BigPizzaV3/CodexPlusPlus)
-- Script Market: [BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
-- Migration repository: [JHees/bennett-ui-improvements-for-codexplusplus](https://github.com/JHees/bennett-ui-improvements-for-codexplusplus)
+- Active runtime: [JHees/codex-script-loader](https://github.com/JHees/codex-script-loader)
+- Legacy Codex++ market snapshot (`1.2.4`): [BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
+- Maintained repository: [JHees/better-ui-improvements-for-codex](https://github.com/JHees/better-ui-improvements-for-codex)
 
 Released under the [MIT License](LICENSE). Original copyright, attribution, and permission notices are preserved in the distributed script and [`NOTICE.md`](NOTICE.md).
