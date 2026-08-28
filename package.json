@@ -1,0 +1,15 @@
+{
+  "name": "better-ui-improvements-for-codex",
+  "version": "1.4.12",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check scripts/bennett-ui-improvements.js && node --check scripts/hidden-user-message-visibility-fix.js",
+    "test": "node --test",
+    "package": "pwsh -NoProfile -File tools/package-plugin.ps1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

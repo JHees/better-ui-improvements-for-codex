@@ -22,7 +22,7 @@
   "use strict";
 
   const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
-  const VERSION = "1.4.11";
+  const VERSION = "1.4.12";
   const PINNED_THREAD_ICON_STYLE_ID = "bennett-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "bennett-ui-improvements:";
@@ -8605,9 +8605,9 @@ function writeFlag(api, id, on) {
 }
 
   const tweak = module.exports;
-  const loaderApi = globalThis.__codexScriptLoader?.activeApi || null;
+  const loaderApi = typeof api === "object" && api ? api : null;
   const baseApi = loaderApi || createBigPizzaRendererApi();
-  const api = createProjectColorCompatibleApi(baseApi);
+  const rendererApi = createProjectColorCompatibleApi(baseApi);
   installPinnedThreadIconStyle();
   if (!tweak || typeof tweak.start !== "function") {
     throw new Error("Bennett UI tweak entrypoint was not found");
@@ -8624,7 +8624,7 @@ function writeFlag(api, id, on) {
     }
   }
 
-  tweak.start.call(tweak, api);
+  tweak.start.call(tweak, rendererApi);
   const features = FEATURE_IDS;
   const featureInfo = FEATURE_DEFINITIONS;
   let settingsScanTimer = 0;
@@ -8678,14 +8678,14 @@ function writeFlag(api, id, on) {
   function featureEnabled(id) {
     const meta = featureInfo.find((item) => item.id === id);
     if (meta?.disabled) return false;
-    return !!api.storage.get(`feature:${id}`, featureDefault(id));
+    return !!rendererApi.storage.get(`feature:${id}`, featureDefault(id));
   }
 
   function setFeatureEnabled(id, enabled) {
     if (!features.includes(id)) {
       throw new Error(`Unknown Bennett UI feature: ${id}`);
     }
-    api.storage.set(`feature:${id}`, !!enabled);
+    rendererApi.storage.set(`feature:${id}`, !!enabled);
     const state = tweak._state;
     if (state && typeof activateFeature === "function" && typeof deactivateFeature === "function") {
       if (enabled) activateFeature(state, id);
@@ -9184,7 +9184,7 @@ function writeFlag(api, id, on) {
   window[INSTALL_KEY] = {
     version: VERSION,
     scriptLoadId: SCRIPT_LOAD_ID,
-    api,
+    api: rendererApi,
     features,
     featureInfo,
     threadActionsStatus() {

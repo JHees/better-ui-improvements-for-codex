@@ -4,7 +4,7 @@
 
 **通过 Codex Script Loader 持续维护的 Bennett UI 界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.11-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.12-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Bennett UI Improvements 1.4.11 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Bennett UI Improvements 1.4.12 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
 本项目最初由 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移而来，保留原作者与 MIT 许可证声明；现在由 [JHees](https://github.com/JHees) 面向 Codex Script Loader 继续维护。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的 Bennett 版本。`1.2.4` 之后的版本（包括当前 `1.4.11`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的 Bennett 版本。`1.2.4` 之后的版本（包括当前 `1.4.12`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -36,9 +36,17 @@ Bennett UI Improvements 1.4.11 是适用于 [Codex Script Loader](https://github
 
 ### 通过 Codex Script Loader
 
-[Codex Script Loader](https://github.com/JHees/codex-script-loader) 已内置本插件，首次运行时会把它安装到 Loader 的脚本注册表。安装 Loader 并通过它启动 Codex 后，即可使用 Loader 管理的 Bennett UI 包。
+本插件独立于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 发布。Loader 仓库不再内置、镜像、版本化或部署 Bennett UI。
 
-开发时，本仓库的 [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) 是唯一事实来源，Loader 内置包由该文件同步生成。
+先运行 `npm test` 和 `npm run check`，再生成可安装 ZIP：
+
+```powershell
+npm run package
+```
+
+在 Loader 设置页安装生成的 `dist/bennett-ui-improvements-<version>.zip`。开发时也可以直接选择本仓库根目录作为插件包，因为 [`manifest.json`](manifest.json) 会指向唯一主源码 [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js)。源码、清单、测试、版本与发布全部由本仓库独立维护。
+
+打包命令还会生成 `dist/bennett-ui-improvements-<version>.zip.sha256`，稳定版 tag 会同时发布这两个文件。此前已安装的 Bennett `1.4.11` 包不含更新声明，因此需要手动安装一次未来首个带 tag 的 update-aware ZIP；迁移完成后，Loader 才能发现后续稳定版 GitHub Release。自动替换仍需用户为本插件单独开启；检查更新本身不会开启自动更新。
 
 ### 旧版 Codex++ 安装
 

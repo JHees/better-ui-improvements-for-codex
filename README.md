@@ -4,7 +4,7 @@
 
 **Bennett UI, maintained for Codex through Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.11-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.12-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,12 +13,12 @@
 
 </div>
 
-Bennett UI Improvements 1.4.11 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Bennett UI Improvements 1.4.12 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 This project began as an adaptation of [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui). It preserves the original authorship and MIT license notices and is now maintained by [JHees](https://github.com/JHees) for Codex Script Loader.
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final Bennett version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.11`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final Bennett version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.12`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -36,9 +36,17 @@ This project began as an adaptation of [b-nnett/codex-plusplus-bennett-ui](https
 
 ### Codex Script Loader
 
-The plugin is bundled with [Codex Script Loader](https://github.com/JHees/codex-script-loader) and is installed into the Loader's script registry on first run. Install and launch Codex through the Loader; Bennett UI is enabled from the Loader-managed script package.
+This plugin is released independently from [Codex Script Loader](https://github.com/JHees/codex-script-loader). It is not bundled with, mirrored into, versioned by, or deployed from the Loader repository.
 
-For development, this repository's [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js) is the source of truth. The Loader package is synchronized from that file.
+Run `npm test` and `npm run check`, then create an installable ZIP with:
+
+```powershell
+npm run package
+```
+
+Install the resulting `dist/bennett-ui-improvements-<version>.zip` from the Loader settings page. For development, the repository root is also a valid package folder because [`manifest.json`](manifest.json) points to the canonical [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js). All source, manifest, tests, versions, and releases are owned by this repository.
+
+The package command also creates `dist/bennett-ui-improvements-<version>.zip.sha256`. Tagged stable releases publish both files. Previously installed `1.4.11` packages do not contain the update declaration, so they need one manual installation of the first future tagged update-aware ZIP. After that migration, Loader can discover later stable GitHub Releases. Automatic replacement remains an opt-in setting for this plugin; checking for updates does not enable it.
 
 ### Legacy Codex++ installations
 

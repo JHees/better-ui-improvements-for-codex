@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "co.bennett.ui-improvements",
+  "name": "Bennett UI Improvements",
+  "version": "1.4.12",
+  "main": "scripts/bennett-ui-improvements.js",
+  "scope": "renderer",
+  "runAt": "document-start",
+  "lifecycleGlobal": "__bennettUiImprovementsBigPizza",
+  "documentation": "README.md",
+  "settings": {
+    "mode": "page",
+    "pageId": "main",
+    "title": "界面增强"
+  },
+  "update": {
+    "provider": "github-releases",
+    "repository": "JHees/better-ui-improvements-for-codex",
+    "asset": "bennett-ui-improvements-{version}.zip"
+  },
+  "permissions": [
+    "dom",
+    "local-storage",
+    "settings"
+  ]
+}

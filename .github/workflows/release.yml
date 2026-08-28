@@ -1,0 +1,94 @@
+name: Bennett UI package
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm run check
+      - run: npm test
+      - run: npm run package
+      - name: Verify package identity and checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $manifest = Get-Content -LiteralPath "./manifest.json" -Raw | ConvertFrom-Json
+          $package = Get-Content -LiteralPath "./package.json" -Raw | ConvertFrom-Json
+          $source = Get-Content -LiteralPath "./scripts/bennett-ui-improvements.js" -Raw
+          $sourceVersion = [regex]::Match($source, 'const VERSION = "([^"]+)"').Groups[1].Value
+          if ($manifest.version -ne $package.version -or $manifest.version -ne $sourceVersion) {
+            throw "Manifest, package, and source versions must match."
+          }
+          if ($env:GITHUB_REF_TYPE -eq "tag") {
+            if ($env:GITHUB_REF_NAME -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+              throw "Release tags must use vMAJOR.MINOR.PATCH."
+            }
+            if ($env:GITHUB_REF_NAME -ne "v$($manifest.version)") {
+              throw "Release tag does not match the package version."
+            }
+          }
+          $zip = "./dist/bennett-ui-improvements-$($manifest.version).zip"
+          $sum = "$zip.sha256"
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = "$actual  $([IO.Path]::GetFileName($zip))"
+          if ((Get-Content -LiteralPath $sum -Raw).Trim() -cne $expected) {
+            throw "Checksum asset does not exactly match the package ZIP."
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            $names = @($archive.Entries.FullName)
+            if (@($names | Where-Object { $_ -eq "manifest.json" }).Count -ne 1) {
+              throw "Package must contain exactly one root manifest.json."
+            }
+            if ($names -notcontains "scripts/bennett-ui-improvements.js") {
+              throw "Package is missing its declared main script."
+            }
+          }
+          finally {
+            $archive.Dispose()
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bennett-ui-package
+          path: |
+            dist/bennett-ui-improvements-*.zip
+            dist/bennett-ui-improvements-*.zip.sha256
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bennett-ui-package
+          path: dist
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --verify-tag --generate-notes --title "$TAG"
+          fi
