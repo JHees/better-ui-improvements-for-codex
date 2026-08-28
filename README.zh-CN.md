@@ -4,7 +4,7 @@
 
 **通过 Codex Script Loader 持续维护的 Bennett UI 界面与工作流增强脚本。**
 
-[![Version](https://img.shields.io/badge/version-1.4.10-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.11-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Bennett UI Improvements 1.4.10 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Bennett UI Improvements 1.4.11 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
 本项目最初由 [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui) 迁移而来，保留原作者与 MIT 许可证声明；现在由 [JHees](https://github.com/JHees) 面向 Codex Script Loader 继续维护。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的 Bennett 版本。`1.2.4` 之后的版本（包括当前 `1.4.10`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的 Bennett 版本。`1.2.4` 之后的版本（包括当前 `1.4.11`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -59,7 +59,7 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 | 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
 | 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 
-所有功能开关都位于 **Codex 设置 → Script-Loader → 界面增强**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.10 通过 Script Loader 提供插件声明的设置页，并复用当前 Codex 设置页的布局、字体、卡片、控件和滚动容器。标题生成继续使用 system 来源的临时工作分支，只接受本次新增且已完成的原生压缩 turn，并只屏蔽精确匹配临时分支的完成通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好会从旧版 Codex++ 存储命名空间迁移到 Script Loader 命名空间。
+所有功能开关都位于 **Codex 设置 → Script-Loader → 界面增强**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.11 恢复了通过 Codex renderer HTTP 服务获取额度，并隐藏了置顶会话行中重复出现的前置会话图标。插件声明的设置页继续复用当前 Codex 设置页的布局、字体、卡片、控件和滚动容器。标题生成继续使用 system 来源的临时工作分支，只接受本次新增且已完成的原生压缩 turn，并只屏蔽精确匹配临时分支的完成通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好会从旧版 Codex++ 存储命名空间迁移到 Script Loader 命名空间。
 
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。Codex 提供稳定项目 ID 时，手动选择会优先绑定该 ID，并保留项目名称作为兼容回退。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 

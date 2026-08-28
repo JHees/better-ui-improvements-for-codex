@@ -22,7 +22,8 @@
   "use strict";
 
   const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
-  const VERSION = "1.4.10";
+  const VERSION = "1.4.11";
+  const PINNED_THREAD_ICON_STYLE_ID = "bennett-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "bennett-ui-improvements:";
   const LOADER_STORAGE_PREFIX = "codex-script-loader:co.bennett.ui-improvements:";
@@ -3554,7 +3555,8 @@ const FEATURES = {
    *
    * Strategy
    * --------
-   *  1. Fetch `/wham/usage` through Codex's existing renderer fetch bridge.
+   *  1. Fetch `/wham/usage` through Codex's native renderer HTTP client,
+   *     with the legacy renderer fetch bridge retained for older builds.
    *  2. Ignore model-specific renderer events and rendered labels; they can
    *     represent a selected model rather than the main account.
    *  3. Persist the latest current snapshot and refresh the mounted sidebar box in
@@ -3582,6 +3584,8 @@ const FEATURES = {
     let directUsageSuccessLogged = false;
     let usageBridgeReadyLogged = false;
     let usageBridgeScriptInjected = false;
+    let nativeHttpClient = null;
+    let nativeHttpClientCandidatesPromise = null;
     let bridgeRequestSeq = 0;
     let disposed = false;
     let lastMountedMode = null;
@@ -3743,12 +3747,102 @@ const FEATURES = {
       );
     };
 
-    const fetchCodexAppServerJson = async (url, timeoutMs = 10_000) => {
+    const nativeHttpClientModuleUrls = () => {
+      const urls = new Set();
+      const add = (value) => {
+        if (!value) return;
+        let url = "";
+        try {
+          url = new URL(String(value), window.location.href).href;
+        } catch {
+          return;
+        }
+        if (/\/assets\/app-initial-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
+      };
+      document.querySelectorAll("script[src], link[href]").forEach((node) => {
+        add(node.src || node.href);
+      });
       try {
-        return await api.ipc.invoke("usage-fetch", url);
+        performance.getEntriesByType("resource").forEach((entry) => add(entry.name));
+      } catch {}
+      return [...urls];
+    };
+
+    const resolveNativeHttpClientCandidates = async () => {
+      if (nativeHttpClientCandidatesPromise) return nativeHttpClientCandidatesPromise;
+      nativeHttpClientCandidatesPromise = (async () => {
+        const candidates = [];
+        const seen = new Set();
+        let lastError = null;
+        for (const moduleUrl of nativeHttpClientModuleUrls()) {
+          try {
+            const nativeModule = await import(moduleUrl);
+            for (const value of Object.values(nativeModule)) {
+              if (
+                !value ||
+                (typeof value !== "object" && typeof value !== "function") ||
+                typeof value.safeGet !== "function" ||
+                seen.has(value)
+              ) {
+                continue;
+              }
+              seen.add(value);
+              candidates.push(value);
+            }
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        if (!candidates.length) {
+          throw lastError || new Error("Codex native HTTP client is unavailable");
+        }
+        return candidates;
+      })();
+      try {
+        return await nativeHttpClientCandidatesPromise;
+      } catch (error) {
+        nativeHttpClientCandidatesPromise = null;
+        throw error;
+      }
+    };
+
+    const fetchWithNativeHttpClient = async (url) => {
+      let lastError = null;
+      if (nativeHttpClient) {
+        try {
+          return await nativeHttpClient.safeGet(url);
+        } catch (error) {
+          lastError = error;
+          nativeHttpClient = null;
+        }
+      }
+      for (const candidate of await resolveNativeHttpClientCandidates()) {
+        try {
+          const result = await candidate.safeGet(url);
+          nativeHttpClient = candidate;
+          return result;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("Codex native HTTP request failed");
+    };
+
+    const fetchCodexAppServerJson = async (url, timeoutMs = 10_000) => {
+      if (typeof api.ipc?.invoke === "function") {
+        try {
+          return await api.ipc.invoke("usage-fetch", url);
+        } catch {
+          // Older runtimes or a failed main-webview probe fall through to the
+          // native renderer HTTP client and legacy bridge attempts below.
+        }
+      }
+
+      try {
+        return await fetchWithNativeHttpClient(url);
       } catch {
-        // Older runtimes or a failed main-webview probe fall through to the
-        // renderer bridge attempt below.
+        // Codex builds before the HTTP fetch service exposed no importable
+        // native client. Keep the legacy renderer bridge for those builds.
       }
 
       const hostId =
@@ -8514,6 +8608,7 @@ function writeFlag(api, id, on) {
   const loaderApi = globalThis.__codexScriptLoader?.activeApi || null;
   const baseApi = loaderApi || createBigPizzaRendererApi();
   const api = createProjectColorCompatibleApi(baseApi);
+  installPinnedThreadIconStyle();
   if (!tweak || typeof tweak.start !== "function") {
     throw new Error("Bennett UI tweak entrypoint was not found");
   }
@@ -9123,6 +9218,7 @@ function writeFlag(api, id, on) {
         delete settingsModal.dataset.bennettUiSettingsVersion;
       }
       document.getElementById("bennett-ui-settings-style")?.remove();
+      document.getElementById(PINNED_THREAD_ICON_STYLE_ID)?.remove();
       if (typeof tweak.stop === "function") {
         tweak.stop.call(tweak);
       }
@@ -9222,6 +9318,18 @@ function writeFlag(api, id, on) {
     });
 
     return Object.freeze({ ...baseApi, storage });
+  }
+
+  function installPinnedThreadIconStyle() {
+    document.getElementById(PINNED_THREAD_ICON_STYLE_ID)?.remove();
+    const style = document.createElement("style");
+    style.id = PINNED_THREAD_ICON_STYLE_ID;
+    style.textContent = `
+      [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-pinned="true"] .icon-leading-slot {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function createBigPizzaRendererApi() {
