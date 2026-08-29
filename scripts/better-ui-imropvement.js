@@ -1,10 +1,8 @@
 /*
- * Bennett UI Improvements for Codex
+ * Better UI Imropvement for Codex
  *
- * Source project: https://github.com/b-nnett/codex-plusplus-bennett-ui
- * Original tweak id: co.bennett.ui-improvements
- * Original author: bennett
- * Original license: MIT License, Copyright (c) 2026 Bennett
+ * Independent implementation for Codex Script Loader.
+ * Copyright (c) 2026 JHees. Released under the MIT License.
  *
  * This file began as a compatibility migration from the b-nnett Codex++
  * tweak. BigPizzaV3 Codex++ support ended with the market-published 1.2.4;
@@ -21,12 +19,12 @@
 (() => {
   "use strict";
 
-  const INSTALL_KEY = "__bennettUiImprovementsBigPizza";
+  const INSTALL_KEY = "__betterUiImropvement";
   const VERSION = "1.4.12";
-  const PINNED_THREAD_ICON_STYLE_ID = "bennett-ui-pinned-thread-icon-style";
+  const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
-  const LEGACY_STORAGE_PREFIX = "bennett-ui-improvements:";
-  const LOADER_STORAGE_PREFIX = "codex-script-loader:co.bennett.ui-improvements:";
+  const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
+  const LOADER_STORAGE_PREFIX = "codex-script-loader:io.github.jhees.better-ui-imropvement:";
   const SCRIPT_LOAD_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lifecycleTimers = new Set();
   const lifecycleSignatures = new Set();
@@ -112,14 +110,14 @@
     if (event === "usage-mounted" && lifecycleSignatures.has(signature)) return;
     lifecycleSignatures.add(signature);
     const payload = {
-      event: `bennett-ui.${event}`,
+      event: `better-ui-imropvement-ui.${event}`,
       version: VERSION,
       scriptLoadId: SCRIPT_LOAD_ID,
       ...detail,
     };
-    window.__bennettUiLastLifecycle = payload;
+    window.__betterUiImropvementLastLifecycle = payload;
     try {
-      window.dispatchEvent(new CustomEvent("bennett-ui-lifecycle", { detail: payload }));
+      window.dispatchEvent(new CustomEvent("better-ui-imropvement-ui-lifecycle", { detail: payload }));
     } catch (_) {}
   }
 
@@ -137,14 +135,14 @@
     try {
       previous.stop();
     } catch (error) {
-      console.warn("[Bennett UI/BigPizza] previous stop failed", error);
+      console.warn("[Better UI Imropvement] previous stop failed", error);
     }
   }
 
   const module = { exports: {} };
   const exports = module.exports;
 /**
- * Bennett's UI Improvements
+ * Better UI Imropvement
  *
  * A bag of small, individually-toggleable UI tweaks for Codex. Settings
  * live on a dedicated sidebar entry under the Script-Loader group.
@@ -255,13 +253,13 @@ const sessionThreadActions = createSessionThreadActionsManager();
 
 function createSessionThreadActionsManager() {
   const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row]";
-  const STYLE_ID = "bennett-thread-context-actions-style";
-  const TOAST_ID = "bennett-thread-context-actions-toasts";
-  const DIALOG_ATTR = "data-bennett-thread-delete-dialog";
-  const REGENERATE_ITEM_ID = "bennett-thread-regenerate-title";
-  const EXPORT_ITEM_ID = "bennett-thread-export-markdown";
-  const DELETE_SEPARATOR_ID = "bennett-thread-danger-separator";
-  const DELETE_ITEM_ID = "bennett-thread-delete-permanently";
+  const STYLE_ID = "better-ui-imropvement-thread-context-actions-style";
+  const TOAST_ID = "better-ui-imropvement-thread-context-actions-toasts";
+  const DIALOG_ATTR = "data-better-ui-imropvement-thread-delete-dialog";
+  const REGENERATE_ITEM_ID = "better-ui-imropvement-thread-regenerate-title";
+  const EXPORT_ITEM_ID = "better-ui-imropvement-thread-export-markdown";
+  const DELETE_SEPARATOR_ID = "better-ui-imropvement-thread-danger-separator";
+  const DELETE_ITEM_ID = "better-ui-imropvement-thread-delete-permanently";
   const LOCAL_THREAD_ID_PATTERN = /^(?:urn:uuid:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
   const MENU_SOURCE_MARKERS = [
     "rename-thread",
@@ -356,9 +354,9 @@ function createSessionThreadActionsManager() {
       };
 
   const nativeMessage = (id, defaultMessage) => ({
-    id: `bennettUi.threadActions.${id}`,
+    id: `betterUiImropvement.threadActions.${id}`,
     defaultMessage,
-    description: "Bennett UI native thread context action",
+    description: "Better UI Imropvement native thread context action",
   });
 
   const svgIcon = (path) => {
@@ -382,7 +380,7 @@ function createSessionThreadActionsManager() {
         display: none !important;
       }
 
-      ${THREAD_SELECTOR}[data-bennett-title-working-thread="true"] {
+      ${THREAD_SELECTOR}[data-better-ui-imropvement-title-working-thread="true"] {
         display: none !important;
       }
 
@@ -398,7 +396,7 @@ function createSessionThreadActionsManager() {
         pointer-events: none;
       }
 
-      #${TOAST_ID} .bennett-thread-toast {
+      #${TOAST_ID} .better-ui-imropvement-thread-toast {
         box-sizing: border-box;
         border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
         border-radius: 10px;
@@ -411,7 +409,7 @@ function createSessionThreadActionsManager() {
         pointer-events: auto;
       }
 
-      #${TOAST_ID} .bennett-thread-toast[data-tone="error"] {
+      #${TOAST_ID} .better-ui-imropvement-thread-toast[data-tone="error"] {
         border-color: color-mix(in srgb, var(--red-400, #fa423e) 55%, transparent);
       }
 
@@ -436,7 +434,7 @@ function createSessionThreadActionsManager() {
         background: transparent;
       }
 
-      [${DIALOG_ATTR}] .bennett-thread-delete-card {
+      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-card {
         box-sizing: border-box;
         width: min(440px, 100%);
         border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
@@ -460,7 +458,7 @@ function createSessionThreadActionsManager() {
         line-height: 1.55;
       }
 
-      [${DIALOG_ATTR}] .bennett-thread-delete-actions {
+      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-actions {
         display: flex;
         justify-content: flex-end;
         gap: 8px;
@@ -481,7 +479,7 @@ function createSessionThreadActionsManager() {
         background: color-mix(in srgb, currentColor 13%, transparent);
       }
 
-      [${DIALOG_ATTR}] .bennett-thread-delete-confirm {
+      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-confirm {
         border-color: var(--red-400, #fa423e);
         background: var(--red-400, #fa423e);
         color: white;
@@ -499,7 +497,7 @@ function createSessionThreadActionsManager() {
       document.body.appendChild(root);
     }
     const toast = document.createElement("div");
-    toast.className = "bennett-thread-toast";
+    toast.className = "better-ui-imropvement-thread-toast";
     toast.dataset.tone = tone;
     toast.textContent = String(message || "");
     root.appendChild(toast);
@@ -673,7 +671,7 @@ function createSessionThreadActionsManager() {
         // Keep an already wrapped native menu discoverable on later scans. Without
         // this marker check, the wrapper no longer matches the native source
         // markers and patchMenus() immediately restores it as an inactive ref.
-        if (typeof candidate.__bennettThreadMenuOriginal === "function") return ref;
+        if (typeof candidate.__betterUiImropvementThreadMenuOriginal === "function") return ref;
         let source = "";
         try {
           source = Function.prototype.toString.call(candidate);
@@ -748,10 +746,10 @@ function createSessionThreadActionsManager() {
         row.getAttribute("data-app-action-sidebar-thread-id") || "",
       ).replace(/^local:/, "");
       if (titleWorkingThreadIds.has(rowThreadId)) {
-        row.setAttribute("data-bennett-title-working-thread", "true");
+        row.setAttribute("data-better-ui-imropvement-title-working-thread", "true");
         continue;
       }
-      row.removeAttribute("data-bennett-title-working-thread");
+      row.removeAttribute("data-better-ui-imropvement-title-working-thread");
       const context = threadContextFor(row);
       if (!context) continue;
       const ref = threadMenuRefFor(row);
@@ -765,16 +763,16 @@ function createSessionThreadActionsManager() {
       if (record) patchedMenuRefs.delete(ref);
       let original = ref.current;
       if (typeof original !== "function") continue;
-      if (original.__bennettThreadMenuOriginal) original = original.__bennettThreadMenuOriginal;
+      if (original.__betterUiImropvementThreadMenuOriginal) original = original.__betterUiImropvementThreadMenuOriginal;
       record = { context, original, wrapped: null };
-      record.wrapped = function bennettThreadContextItems(...args) {
+      record.wrapped = function betterUiImropvementThreadContextItems(...args) {
         const result = record.original.apply(this, args);
         if (result && typeof result.then === "function") {
           return result.then((items) => appendThreadActions(items, record.context));
         }
         return appendThreadActions(result, record.context);
       };
-      record.wrapped.__bennettThreadMenuOriginal = original;
+      record.wrapped.__betterUiImropvementThreadMenuOriginal = original;
       try {
         ref.current = record.wrapped;
         if (ref.current === record.wrapped) patchedMenuRefs.set(ref, record);
@@ -944,7 +942,7 @@ function createSessionThreadActionsManager() {
   async function showTitleProgress(message, scope) {
     try {
       const toast = await loadNativeToast(scope);
-      const id = `bennett-title-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
+      const id = `better-ui-imropvement-title-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`}`;
       let dismissed = false;
       let handle = null;
       let revision = 0;
@@ -1670,19 +1668,19 @@ function createSessionThreadActionsManager() {
     const overlay = document.createElement("dialog");
     overlay.setAttribute(DIALOG_ATTR, "true");
     overlay.innerHTML = `
-      <div class="bennett-thread-delete-card" role="dialog" aria-modal="true" aria-labelledby="bennett-thread-delete-title">
-        <h2 id="bennett-thread-delete-title"></h2>
+      <div class="better-ui-imropvement-thread-delete-card" role="dialog" aria-modal="true" aria-labelledby="better-ui-imropvement-thread-delete-title">
+        <h2 id="better-ui-imropvement-thread-delete-title"></h2>
         <p></p>
-        <div class="bennett-thread-delete-actions">
-          <button type="button" data-bennett-delete-cancel="true"></button>
-          <button type="button" class="bennett-thread-delete-confirm" data-bennett-delete-confirm="true"></button>
+        <div class="better-ui-imropvement-thread-delete-actions">
+          <button type="button" data-better-ui-imropvement-delete-cancel="true"></button>
+          <button type="button" class="better-ui-imropvement-thread-delete-confirm" data-better-ui-imropvement-delete-confirm="true"></button>
         </div>
       </div>
     `;
     overlay.querySelector("h2").textContent = text.deleteTitle;
     overlay.querySelector("p").textContent = text.deleteBody.replace("{title}", context.title);
-    const cancel = overlay.querySelector("[data-bennett-delete-cancel]");
-    const confirm = overlay.querySelector("[data-bennett-delete-confirm]");
+    const cancel = overlay.querySelector("[data-better-ui-imropvement-delete-cancel]");
+    const confirm = overlay.querySelector("[data-better-ui-imropvement-delete-confirm]");
     cancel.textContent = text.cancel;
     confirm.textContent = text.confirmDelete;
     const previousFocus = document.activeElement;
@@ -1819,7 +1817,7 @@ function createSessionThreadActionsManager() {
     inFlight.clear();
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(TOAST_ID)?.remove();
-    document.querySelector(`[${DIALOG_ATTR}] [data-bennett-delete-cancel]`)?.click();
+    document.querySelector(`[${DIALOG_ATTR}] [data-better-ui-imropvement-delete-cancel]`)?.click();
     document.querySelector(`[${DIALOG_ATTR}]`)?.remove();
     resolverPromise = null;
     appInitialModulesPromise = null;
@@ -1857,7 +1855,7 @@ function createSessionThreadActionsManager() {
         guardedTitleNotificationCount,
         lastGuardedTitleThreadId,
         hiddenTitleWorkingRowCount: rows.filter((row) =>
-          row.getAttribute("data-bennett-title-working-thread") === "true" &&
+          row.getAttribute("data-better-ui-imropvement-title-working-thread") === "true" &&
           getComputedStyle(row).display === "none",
         ).length,
       };
@@ -1906,12 +1904,12 @@ const FEATURES = {
    * scrolling, clipping, selection, and lifecycle.
    */
   "render-markdown-preview-math"(api) {
-    const STYLE_ID = "bennett-markdown-preview-math-style";
-    const FORMULA_ATTR = "data-bennett-markdown-preview-math";
-    const EDITOR_ATTR = "data-bennett-markdown-preview-math-editor";
-    const EDITING_ATTR = "data-bennett-markdown-preview-math-editing";
-    const IMAGE_ATTR = "data-bennett-markdown-preview-image";
-    const IMAGE_STATUS_ATTR = "data-bennett-markdown-preview-image-status";
+    const STYLE_ID = "better-ui-imropvement-markdown-preview-math-style";
+    const FORMULA_ATTR = "data-better-ui-imropvement-markdown-preview-math";
+    const EDITOR_ATTR = "data-better-ui-imropvement-markdown-preview-math-editor";
+    const EDITING_ATTR = "data-better-ui-imropvement-markdown-preview-math-editing";
+    const IMAGE_ATTR = "data-better-ui-imropvement-markdown-preview-image";
+    const IMAGE_STATUS_ATTR = "data-better-ui-imropvement-markdown-preview-image-status";
     const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
     const IMAGE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
     const IMAGE_READ_CONCURRENCY = 2;
@@ -2199,7 +2197,7 @@ const FEATURES = {
           : typeof window.crypto?.getRandomValues === "function"
             ? Array.from(window.crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16)).join("-")
             : `${Date.now()}-${requestSequence}-${Math.random().toString(36).slice(2)}`;
-      const requestId = `bennett-preview-${randomSuffix}`;
+      const requestId = `better-ui-imropvement-preview-${randomSuffix}`;
       return new Promise((resolve, reject) => {
         let finished = false;
         const cleanup = () => {
@@ -3044,14 +3042,14 @@ const FEATURES = {
 
         destroy(dom) {
           if (!dom) return;
-          dom.__bennettImageActive = false;
-          dom.__bennettImageObserver?.disconnect();
+          dom.__betterUiImropvementImageActive = false;
+          dom.__betterUiImropvementImageObserver?.disconnect();
         }
 
         toDOM(view) {
           const ownerDocument = view.dom.ownerDocument;
           const element = ownerDocument.createElement(this.block ? "div" : "span");
-          element.__bennettImageActive = true;
+          element.__betterUiImropvementImageActive = true;
           element.setAttribute(IMAGE_ATTR, this.block ? "block" : "inline");
           element.setAttribute("contenteditable", "false");
           element.setAttribute("role", "img");
@@ -3075,12 +3073,12 @@ const FEATURES = {
           };
 
           const renderImage = () => {
-            if (!element.__bennettImageActive) return;
+            if (!element.__betterUiImropvementImageActive) return;
             renderStatus("loading", loadingMessage);
             loadImageSource(this.target, this.filePath, this.hostId)
               .then((source) => {
                 if (
-                  !element.__bennettImageActive ||
+                  !element.__betterUiImropvementImageActive ||
                   element.hasAttribute(EDITING_ATTR)
                 ) {
                   return;
@@ -3092,7 +3090,7 @@ const FEATURES = {
                   once: true,
                 });
                 image.addEventListener("error", () => {
-                  if (!element.__bennettImageActive) return;
+                  if (!element.__betterUiImropvementImageActive) return;
                   renderStatus(
                     "error",
                     `无法显示图片：${this.alt || this.target}`,
@@ -3104,7 +3102,7 @@ const FEATURES = {
               })
               .catch((error) => {
                 if (
-                  !element.__bennettImageActive ||
+                  !element.__betterUiImropvementImageActive ||
                   element.hasAttribute(EDITING_ATTR)
                 ) {
                   return;
@@ -3181,11 +3179,11 @@ const FEATURES = {
             if (event.key === "Enter" || event.key === " ") beginEdit(event);
           });
           const startLoading = () => {
-            if (loadingStarted || !element.__bennettImageActive) return;
+            if (loadingStarted || !element.__betterUiImropvementImageActive) return;
             loadingStarted = true;
             imageObserver?.disconnect();
             imageObserver = null;
-            element.__bennettImageObserver = null;
+            element.__betterUiImropvementImageObserver = null;
             renderImage();
           };
           renderStatus(
@@ -3202,7 +3200,7 @@ const FEATURES = {
               rootMargin: "400px 0px",
               threshold: 0,
             });
-            element.__bennettImageObserver = imageObserver;
+            element.__betterUiImropvementImageObserver = imageObserver;
             imageObserver.observe(element);
           } else {
             startLoading();
@@ -3369,7 +3367,7 @@ const FEATURES = {
       subtree: true,
     });
 
-    window.__bennettMarkdownPreviewMath = {
+    window.__betterUiImropvementMarkdownPreviewMath = {
       getStats() {
         return {
           enabled: !disposed,
@@ -3411,7 +3409,7 @@ const FEATURES = {
       imageCache.clear();
       imageCacheBytes = 0;
       style.remove();
-      delete window.__bennettMarkdownPreviewMath;
+      delete window.__betterUiImropvementMarkdownPreviewMath;
     };
   },
 
@@ -7264,7 +7262,7 @@ const FEATURES = {
     const STYLE_ID = "codexpp-sidebar-project-backgrounds";
     const ATTR = "data-codexpp-sidebar-project-backgrounds";
     const COLOR_STORAGE_KEY = PROJECT_COLOR_STORAGE_KEY;
-    const NATIVE_COLOR_MENU_ID = "bennett-ui:project-color";
+    const NATIVE_COLOR_MENU_ID = "better-ui-imropvement-ui:project-color";
     const ASIDE_SELECTOR = [
       "aside.pointer-events-auto.relative.flex.overflow-hidden",
       "aside.pointer-events-auto.relative.flex.overflow-visible",
@@ -7756,9 +7754,9 @@ const FEATURES = {
     };
 
     const nativeMenuMessage = (id, defaultMessage) => ({
-      id: `bennettUi.${id}`,
+      id: `betterUiImropvement.${id}`,
       defaultMessage,
-      description: "Bennett UI project color menu",
+      description: "Better UI Imropvement project color menu",
     });
 
     const nativeMenuLabels = () => {
@@ -7882,7 +7880,7 @@ const FEATURES = {
         if (record) patchedProjectActionHandles.delete(handle);
         const original = handle.getContextMenuItems;
         record = { info, original, wrapped: null };
-        record.wrapped = function bennettProjectColorMenuItems(...args) {
+        record.wrapped = function betterUiImropvementProjectColorMenuItems(...args) {
           const items = record.original.apply(this, args);
           return appendProjectColorSubmenu(items, record.info);
         };
@@ -8610,7 +8608,7 @@ function writeFlag(api, id, on) {
   const rendererApi = createProjectColorCompatibleApi(baseApi);
   installPinnedThreadIconStyle();
   if (!tweak || typeof tweak.start !== "function") {
-    throw new Error("Bennett UI tweak entrypoint was not found");
+    throw new Error("Better UI Imropvement entrypoint was not found");
   }
 
   if (loaderApi?.storage) {
@@ -8618,7 +8616,7 @@ function writeFlag(api, id, on) {
       const key = `feature:${id}`;
       if (loaderApi.storage.get(key, undefined) !== undefined) continue;
       try {
-        const legacy = localStorage.getItem(`bennett-ui-improvements:${key}`);
+        const legacy = localStorage.getItem(`better-ui-imropvement-ui-improvements:${key}`);
         if (legacy !== null) loaderApi.storage.set(key, JSON.parse(legacy));
       } catch {}
     }
@@ -8639,11 +8637,11 @@ function writeFlag(api, id, on) {
     }, 100);
   };
   const handleSidecarSettingsSelect = (event) => {
-    if (event?.detail?.id !== "bennett-ui") deactivateNativeSettingsPanel();
+    if (event?.detail?.id !== "better-ui-imropvement-ui") deactivateNativeSettingsPanel();
   };
   const handleNativeSettingsNavigation = (event) => {
     const target = event.target instanceof Element ? event.target.closest("button[data-settings-panel-slug]") : null;
-    if (target && target.id !== "bennett-ui-native-settings-nav") deactivateNativeSettingsPanel();
+    if (target && target.id !== "better-ui-imropvement-ui-native-settings-nav") deactivateNativeSettingsPanel();
   };
   if (loaderApi?.settings?.registerPage) {
     settingsPageHandle = loaderApi.settings.registerPage({
@@ -8652,13 +8650,13 @@ function writeFlag(api, id, on) {
       description: "",
       iconSvg: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm inline-block align-middle" aria-hidden="true"><path d="M10 2.5 11.4 8.6 17.5 10l-6.1 1.4L10 17.5l-1.4-6.1L2.5 10l6.1-1.4L10 2.5Z" fill="currentColor"/></svg>',
       render(root) {
-        root.dataset.bennettUiSettingsRoot = "true";
+        root.dataset.betterUiImropvementSettingsRoot = "true";
         root.innerHTML = settingsPanelHtml();
         bindSettingsPanel(root);
         ensureSettingsStyle();
         refreshSettingsPanel(root);
         return () => {
-          delete root.dataset.bennettUiSettingsRoot;
+          delete root.dataset.betterUiImropvementSettingsRoot;
           root.innerHTML = "";
         };
       },
@@ -8683,7 +8681,7 @@ function writeFlag(api, id, on) {
 
   function setFeatureEnabled(id, enabled) {
     if (!features.includes(id)) {
-      throw new Error(`Unknown Bennett UI feature: ${id}`);
+      throw new Error(`Unknown Better UI Imropvement feature: ${id}`);
     }
     rendererApi.storage.set(`feature:${id}`, !!enabled);
     const state = tweak._state;
@@ -8700,37 +8698,37 @@ function writeFlag(api, id, on) {
       installNativeSettingsPanel();
       return;
     }
-    document.getElementById("bennett-ui-settings-launcher")?.remove();
-    document.getElementById("bennett-ui-settings-dialog")?.remove();
+    document.getElementById("better-ui-imropvement-ui-settings-launcher")?.remove();
+    document.getElementById("better-ui-imropvement-ui-settings-dialog")?.remove();
     const tabs = modal.querySelector(".codex-plus-tabs");
     const body = modal.querySelector(".codex-plus-modal-body");
     if (!tabs || !body) return;
-    const currentTab = tabs.querySelector('[data-codex-plus-tab="bennettUi"]');
-    const currentPanel = body.querySelector('[data-codex-plus-panel="bennettUi"]');
+    const currentTab = tabs.querySelector('[data-codex-plus-tab="betterUiImropvement"]');
+    const currentPanel = body.querySelector('[data-codex-plus-panel="betterUiImropvement"]');
     if (
-      modal.dataset.bennettUiSettingsLoadId === SCRIPT_LOAD_ID &&
+      modal.dataset.betterUiImropvementSettingsLoadId === SCRIPT_LOAD_ID &&
       currentTab &&
       currentPanel
     ) {
       return;
     }
-    modal.dataset.bennettUiSettingsVersion = VERSION;
-    modal.dataset.bennettUiSettingsLoadId = SCRIPT_LOAD_ID;
+    modal.dataset.betterUiImropvementSettingsVersion = VERSION;
+    modal.dataset.betterUiImropvementSettingsLoadId = SCRIPT_LOAD_ID;
 
-    tabs.querySelectorAll('[data-codex-plus-tab="bennettUi"]').forEach((node) => node.remove());
-    body.querySelectorAll('[data-codex-plus-panel="bennettUi"]').forEach((node) => node.remove());
+    tabs.querySelectorAll('[data-codex-plus-tab="betterUiImropvement"]').forEach((node) => node.remove());
+    body.querySelectorAll('[data-codex-plus-panel="betterUiImropvement"]').forEach((node) => node.remove());
 
     const tab = document.createElement("button");
     tab.type = "button";
     tab.className = "codex-plus-tab-button";
-    tab.dataset.codexPlusTab = "bennettUi";
+    tab.dataset.codexPlusTab = "betterUiImropvement";
     tab.dataset.active = "false";
     tab.textContent = "界面增强";
     tabs.appendChild(tab);
 
     const panel = document.createElement("div");
     panel.className = "codex-plus-panel";
-    panel.dataset.codexPlusPanel = "bennettUi";
+    panel.dataset.codexPlusPanel = "betterUiImropvement";
     panel.hidden = true;
     panel.innerHTML = settingsPanelHtml();
     bindSettingsPanel(panel);
@@ -8742,11 +8740,11 @@ function writeFlag(api, id, on) {
   function bindSettingsPanel(panel) {
     panel.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-      const toggle = target?.closest("[data-bennett-ui-feature]");
+      const toggle = target?.closest("[data-better-ui-imropvement-ui-feature]");
       if (!toggle) return;
       event.preventDefault();
       event.stopPropagation();
-      const id = toggle.getAttribute("data-bennett-ui-feature");
+      const id = toggle.getAttribute("data-better-ui-imropvement-ui-feature");
       const meta = featureInfo.find((item) => item.id === id);
       if (!id || meta?.disabled) return;
       setFeatureEnabled(id, !featureEnabled(id));
@@ -8765,8 +8763,8 @@ function writeFlag(api, id, on) {
 
   function deactivateNativeSettingsPanel() {
     nativeSettingsActive = false;
-    const panel = document.getElementById("bennett-ui-native-settings-panel");
-    const button = document.getElementById("bennett-ui-native-settings-nav");
+    const panel = document.getElementById("better-ui-imropvement-ui-native-settings-panel");
+    const button = document.getElementById("better-ui-imropvement-ui-native-settings-nav");
     if (panel) panel.hidden = true;
     button?.removeAttribute("aria-current");
     const { main } = nativeSettingsParts();
@@ -8782,10 +8780,10 @@ function writeFlag(api, id, on) {
 
   function activateNativeSettingsPanel() {
     const { nav, main } = nativeSettingsParts();
-    const panel = document.getElementById("bennett-ui-native-settings-panel");
-    const button = document.getElementById("bennett-ui-native-settings-nav");
+    const panel = document.getElementById("better-ui-imropvement-ui-native-settings-panel");
+    const button = document.getElementById("better-ui-imropvement-ui-native-settings-nav");
     if (!nav || !main || !panel || !button) return;
-    window.dispatchEvent(new CustomEvent("codex-sidecar-settings-select", { detail: { id: "bennett-ui" } }));
+    window.dispatchEvent(new CustomEvent("codex-sidecar-settings-select", { detail: { id: "better-ui-imropvement-ui" } }));
     nativeSettingsActive = true;
     nav.querySelectorAll("[aria-current='page']").forEach((node) => node.removeAttribute("aria-current"));
     button.setAttribute("aria-current", "page");
@@ -8799,22 +8797,22 @@ function writeFlag(api, id, on) {
   }
 
   function installNativeSettingsPanel() {
-    document.getElementById("bennett-ui-settings-launcher")?.remove();
-    document.getElementById("bennett-ui-settings-dialog")?.remove();
+    document.getElementById("better-ui-imropvement-ui-settings-launcher")?.remove();
+    document.getElementById("better-ui-imropvement-ui-settings-dialog")?.remove();
     const { nav, main } = nativeSettingsParts();
     if (!nav || !main) return;
-    const existingNav = document.getElementById("bennett-ui-native-settings-nav");
-    const existingPanel = document.getElementById("bennett-ui-native-settings-panel");
+    const existingNav = document.getElementById("better-ui-imropvement-ui-native-settings-nav");
+    const existingPanel = document.getElementById("better-ui-imropvement-ui-native-settings-panel");
     if (existingNav?.isConnected && existingPanel?.isConnected && existingPanel.parentElement === main) return;
 
-    let navButton = document.getElementById("bennett-ui-native-settings-nav");
+    let navButton = document.getElementById("better-ui-imropvement-ui-native-settings-nav");
     if (!navButton) {
       const template = nav.querySelector("button[data-settings-panel-slug]");
       if (!template) return;
       navButton = template.cloneNode(false);
-      navButton.id = "bennett-ui-native-settings-nav";
+      navButton.id = "better-ui-imropvement-ui-native-settings-nav";
       navButton.type = "button";
-      navButton.dataset.settingsPanelSlug = "bennett-ui";
+      navButton.dataset.settingsPanelSlug = "better-ui-imropvement-ui";
       navButton.removeAttribute("aria-current");
       navButton.setAttribute("aria-label", "界面增强");
       navButton.innerHTML = '<div class="flex min-w-0 items-center text-base gap-2 flex-1 text-default"><span class="flex w-4 shrink-0 items-center justify-center" aria-hidden="true">◈</span><span class="text-fade-truncate">界面增强</span></div>';
@@ -8826,18 +8824,18 @@ function writeFlag(api, id, on) {
       const anchor = nav.querySelector("button[data-settings-panel-slug='plugins']") || template;
       const wrapper = document.createElement("div");
       wrapper.className = "contents";
-      wrapper.dataset.sidecarSettingsNav = "bennett-ui";
+      wrapper.dataset.sidecarSettingsNav = "better-ui-imropvement-ui";
       wrapper.appendChild(navButton);
       anchor.parentElement?.after(wrapper);
     }
 
-    let panel = document.getElementById("bennett-ui-native-settings-panel");
+    let panel = document.getElementById("better-ui-imropvement-ui-native-settings-panel");
     if (!panel) {
       panel = document.createElement("div");
-      panel.id = "bennett-ui-native-settings-panel";
-      panel.className = "codex-plus-panel bennett-ui-native-settings-panel";
-      panel.dataset.codexPlusPanel = "bennettUi";
-      panel.dataset.sidecarSettingsPanel = "bennett-ui";
+      panel.id = "better-ui-imropvement-ui-native-settings-panel";
+      panel.className = "codex-plus-panel better-ui-imropvement-ui-native-settings-panel";
+      panel.dataset.codexPlusPanel = "betterUiImropvement";
+      panel.dataset.sidecarSettingsPanel = "better-ui-imropvement-ui";
       panel.hidden = true;
       panel.innerHTML = settingsPanelHtml();
       bindSettingsPanel(panel);
@@ -8874,39 +8872,39 @@ function writeFlag(api, id, on) {
       "thread-permanent-delete": "不可撤销",
     };
     return `
-      <div class="bennett-ui-settings-page flex flex-col gap-10">
+      <div class="better-ui-imropvement-ui-settings-page flex flex-col gap-10">
         ${groups.map((group) => `
-          <section class="bennett-ui-settings-section flex flex-col" data-bennett-ui-section="${escapeAttr(group.id)}">
+          <section class="better-ui-imropvement-ui-settings-section flex flex-col" data-better-ui-imropvement-ui-section="${escapeAttr(group.id)}">
             <div class="flex justify-between gap-4 min-h-toolbar items-center pb-1.5">
               <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div class="bennett-ui-section-title font-medium text-default text-base">${escapeHtmlLocal(group.title)}</div>
+                <div class="better-ui-imropvement-ui-section-title font-medium text-default text-base">${escapeHtmlLocal(group.title)}</div>
               </div>
             </div>
-            <div class="bennett-ui-settings-group flex flex-col [&>*:not(:last-child)]:relative [&>*:not(:last-child)]:after:pointer-events-none [&>*:not(:last-child)]:after:absolute [&>*:not(:last-child)]:after:inset-x-4 [&>*:not(:last-child)]:after:bottom-0 [&>*:not(:last-child)]:after:h-[0.5px] [&>*:not(:last-child)]:after:bg-border [&>*:not(:last-child)]:after:content-[''] rounded-2xl overflow-hidden border border-default">
+            <div class="better-ui-imropvement-ui-settings-group flex flex-col [&>*:not(:last-child)]:relative [&>*:not(:last-child)]:after:pointer-events-none [&>*:not(:last-child)]:after:absolute [&>*:not(:last-child)]:after:inset-x-4 [&>*:not(:last-child)]:after:bottom-0 [&>*:not(:last-child)]:after:h-[0.5px] [&>*:not(:last-child)]:after:bg-border [&>*:not(:last-child)]:after:content-[''] rounded-2xl overflow-hidden border border-default">
               ${group.features.map((id) => featureInfo.find((item) => item.id === id)).filter(Boolean).map((item) => `
-                <div class="codex-plus-row bennett-ui-feature-row flex items-center justify-between px-4 gap-6 py-3" data-bennett-ui-row="${escapeAttr(item.id)}">
-                  <div class="bennett-ui-feature-copy flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div class="bennett-ui-feature-title-line">
+                <div class="codex-plus-row better-ui-imropvement-ui-feature-row flex items-center justify-between px-4 gap-6 py-3" data-better-ui-imropvement-ui-row="${escapeAttr(item.id)}">
+                  <div class="better-ui-imropvement-ui-feature-copy flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div class="better-ui-imropvement-ui-feature-title-line">
                       <div class="codex-plus-row-title min-w-0 text-sm text-default font-medium">${escapeHtmlLocal(item.title)}</div>
-                      ${badges[item.id] ? `<span class="bennett-ui-feature-badge" data-tone="${item.id === "thread-permanent-delete" ? "danger" : "neutral"}">${escapeHtmlLocal(badges[item.id])}</span>` : ""}
+                      ${badges[item.id] ? `<span class="better-ui-imropvement-ui-feature-badge" data-tone="${item.id === "thread-permanent-delete" ? "danger" : "neutral"}">${escapeHtmlLocal(badges[item.id])}</span>` : ""}
                     </div>
                     <div class="codex-plus-row-description text-sm text-secondary">${escapeHtmlLocal(item.detail)}</div>
                   </div>
-                  <button type="button" role="switch" aria-label="${escapeAttr(item.title)}" aria-checked="false" class="codex-plus-toggle bennett-ui-toggle" data-bennett-ui-feature="${escapeAttr(item.id)}" ${item.disabled ? "disabled" : ""}><span></span></button>
+                  <button type="button" role="switch" aria-label="${escapeAttr(item.title)}" aria-checked="false" class="codex-plus-toggle better-ui-imropvement-ui-toggle" data-better-ui-imropvement-ui-feature="${escapeAttr(item.id)}" ${item.disabled ? "disabled" : ""}><span></span></button>
                 </div>
               `).join("")}
             </div>
           </section>
         `).join("")}
-        <div class="bennett-ui-settings-footer text-xs text-secondary">Bennett UI Improvements · ${escapeHtmlLocal(VERSION)}</div>
+        <div class="better-ui-imropvement-ui-settings-footer text-xs text-secondary">Better UI Imropvement · ${escapeHtmlLocal(VERSION)}</div>
       </div>
     `;
   }
 
   function refreshSettingsPanel(root = document) {
     for (const item of featureInfo) {
-      const row = root.querySelector(`[data-bennett-ui-row="${cssEscape(item.id)}"]`);
-      const toggle = row?.querySelector("[data-bennett-ui-feature]");
+      const row = root.querySelector(`[data-better-ui-imropvement-ui-row="${cssEscape(item.id)}"]`);
+      const toggle = row?.querySelector("[data-better-ui-imropvement-ui-feature]");
       if (!toggle) continue;
       toggle.dataset.enabled = String(featureEnabled(item.id));
       toggle.dataset.support = item.disabled ? "unsupported" : "supported";
@@ -8916,69 +8914,69 @@ function writeFlag(api, id, on) {
   }
 
   function ensureSettingsStyle() {
-    if (document.getElementById("bennett-ui-settings-style")) return;
+    if (document.getElementById("better-ui-imropvement-ui-settings-style")) return;
     const style = document.createElement("style");
-    style.id = "bennett-ui-settings-style";
+    style.id = "better-ui-imropvement-ui-settings-style";
     style.textContent = `
-      [data-bennett-ui-settings-root="true"] {
+      [data-better-ui-imropvement-ui-settings-root="true"] {
         display: block;
         width: 100%;
         color: var(--color-text-primary, var(--color-token-text-primary, #1a1c1f));
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-settings-page {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-page {
         display: flex;
         flex-direction: column;
         gap: 40px;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-settings-section {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-section {
         display: flex;
         flex-direction: column;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-section-title {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-section-title {
         margin: 0;
         color: var(--color-text-primary, var(--color-token-text-primary, currentColor));
         font-size: 13px;
         font-weight: 500;
         line-height: 1.5;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-settings-group {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-group {
         overflow: hidden;
         border: 1px solid var(--color-border-default, color-mix(in srgb, currentColor 8%, transparent));
         border-radius: 20px;
         background: var(--color-background-primary, transparent);
       }
-      [data-bennett-ui-settings-root="true"] .codex-plus-row {
+      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 24px;
         padding: 12px 16px;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-feature-copy {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-copy {
         min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 2px;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-feature-title-line {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-title-line {
         display: flex;
         align-items: center;
         gap: 8px;
         min-width: 0;
       }
-      [data-bennett-ui-settings-root="true"] .codex-plus-row-title {
+      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row-title {
         color: var(--color-text-primary, currentColor);
         font-size: 13px;
         font-weight: 500;
         line-height: 1.43;
       }
-      [data-bennett-ui-settings-root="true"] .codex-plus-row-description {
+      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row-description {
         margin-top: 0;
         color: var(--color-text-secondary, var(--color-token-text-secondary, #8f96a3));
         font-size: 13px;
         line-height: 1.43;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-feature-badge {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-badge {
         flex: 0 0 auto;
         padding: 2px 6px;
         border-radius: 999px;
@@ -8988,11 +8986,11 @@ function writeFlag(api, id, on) {
         font-weight: 500;
         line-height: 1.35;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-feature-badge[data-tone="danger"] {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-badge[data-tone="danger"] {
         background: color-mix(in srgb, #ef4444 10%, transparent);
         color: var(--color-text-danger, #c24141);
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-toggle {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle {
         flex: 0 0 auto;
         width: 34px;
         height: 20px;
@@ -9002,10 +9000,10 @@ function writeFlag(api, id, on) {
         background: color-mix(in srgb, currentColor 18%, transparent);
         cursor: pointer;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-toggle[data-enabled="true"] {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle[data-enabled="true"] {
         background: var(--color-chart-blue, #3b82f6);
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-toggle span {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle span {
         display: block;
         width: 16px;
         height: 16px;
@@ -9014,17 +9012,17 @@ function writeFlag(api, id, on) {
         box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
         transition: transform .15s ease;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-toggle:focus-visible {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle:focus-visible {
         outline: 2px solid var(--color-focus-ring, #3998f6);
         outline-offset: 2px;
       }
-      [data-bennett-ui-settings-root="true"] .bennett-ui-settings-footer {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-footer {
         padding-top: 2px;
         color: var(--color-text-tertiary, var(--color-text-secondary, #8f96a3));
         font-size: 12px;
         line-height: 1.4;
       }
-      .bennett-ui-native-settings-panel {
+      .better-ui-imropvement-ui-native-settings-panel {
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -9035,8 +9033,8 @@ function writeFlag(api, id, on) {
         background: var(--color-background-primary, #11141a);
         color: var(--color-text-primary, #f3f4f6);
       }
-      .bennett-ui-native-settings-panel[hidden] { display: none !important; }
-      .bennett-ui-native-settings-panel .codex-plus-row {
+      .better-ui-imropvement-ui-native-settings-panel[hidden] { display: none !important; }
+      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -9046,12 +9044,12 @@ function writeFlag(api, id, on) {
         border-bottom: 0;
         background: var(--color-background-panel, var(--color-background-primary-soft-alpha, rgba(127,127,127,.06)));
       }
-      .bennett-ui-native-settings-panel .codex-plus-row:first-child { border-radius: 16px 16px 0 0; }
-      .bennett-ui-native-settings-panel .codex-plus-row:last-child { border-bottom: 1px solid var(--color-border-default, rgba(127,127,127,.28)); border-radius: 0 0 16px 16px; }
-      .bennett-ui-native-settings-panel .codex-plus-row-title { color: var(--color-text-primary, #f3f4f6) !important; font-weight: 600; }
-      .bennett-ui-native-settings-panel .codex-plus-row-description,
-      .bennett-ui-native-settings-panel .bennett-ui-feature-status { color: var(--color-text-secondary, #a1a1aa) !important; }
-      .bennett-ui-native-settings-panel .bennett-ui-toggle {
+      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row:first-child { border-radius: 16px 16px 0 0; }
+      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row:last-child { border-bottom: 1px solid var(--color-border-default, rgba(127,127,127,.28)); border-radius: 0 0 16px 16px; }
+      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row-title { color: var(--color-text-primary, #f3f4f6) !important; font-weight: 600; }
+      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row-description,
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-feature-status { color: var(--color-text-secondary, #a1a1aa) !important; }
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle {
         flex: 0 0 auto;
         width: 34px;
         height: 20px;
@@ -9061,36 +9059,36 @@ function writeFlag(api, id, on) {
         background: color-mix(in srgb, currentColor 18%, transparent);
         cursor: pointer;
       }
-      .bennett-ui-native-settings-panel .bennett-ui-toggle[data-enabled="true"] { background: var(--color-chart-blue, #3b82f6); }
-      .bennett-ui-native-settings-panel .bennett-ui-toggle span { display: block; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform .15s ease; }
-      [data-codex-plus-panel="bennettUi"] {
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle[data-enabled="true"] { background: var(--color-chart-blue, #3b82f6); }
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle span { display: block; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform .15s ease; }
+      [data-codex-plus-panel="betterUiImropvement"] {
         color: #f3f4f6 !important;
         color-scheme: dark;
       }
-      [data-codex-plus-panel="bennettUi"] .codex-plus-row-title {
+      [data-codex-plus-panel="betterUiImropvement"] .codex-plus-row-title {
         color: #f3f4f6 !important;
       }
-      [data-codex-plus-panel="bennettUi"] .codex-plus-row-description {
+      [data-codex-plus-panel="betterUiImropvement"] .codex-plus-row-description {
         color: #a1a1aa !important;
       }
-      .bennett-ui-settings-note,
-      .bennett-ui-feature-status {
+      .better-ui-imropvement-ui-settings-note,
+      .better-ui-imropvement-ui-feature-status {
         margin-top: 6px;
         color: #a1a1aa !important;
         font-size: 12px;
         line-height: 1.35;
       }
-      .bennett-ui-feature-row[data-enabled="true"] .bennett-ui-feature-status {
+      .better-ui-imropvement-ui-feature-row[data-enabled="true"] .better-ui-imropvement-ui-feature-status {
         color: #d1d5db !important;
       }
-      .bennett-ui-toggle[disabled] {
+      .better-ui-imropvement-ui-toggle[disabled] {
         cursor: not-allowed;
         opacity: 0.45;
       }
-      .bennett-ui-toggle[data-enabled="true"] span {
+      .better-ui-imropvement-ui-toggle[data-enabled="true"] span {
         transform: translateX(14px);
       }
-      #bennett-ui-settings-launcher {
+      #better-ui-imropvement-ui-settings-launcher {
         position: fixed;
         right: 92px;
         bottom: 18px;
@@ -9104,7 +9102,7 @@ function writeFlag(api, id, on) {
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         cursor: pointer;
       }
-      #bennett-ui-settings-dialog {
+      #better-ui-imropvement-ui-settings-dialog {
         width: min(720px, 92vw);
         max-height: min(820px, 88vh);
         padding: 0;
@@ -9113,16 +9111,16 @@ function writeFlag(api, id, on) {
         background: #11141a;
         color: #f3f4f6;
       }
-      #bennett-ui-settings-dialog::backdrop {
+      #better-ui-imropvement-ui-settings-dialog::backdrop {
         background: rgba(0, 0, 0, 0.58);
       }
-      #bennett-ui-settings-dialog [data-codex-plus-panel="bennettUi"] {
+      #better-ui-imropvement-ui-settings-dialog [data-codex-plus-panel="betterUiImropvement"] {
         display: grid;
         max-height: min(820px, 88vh);
         overflow: auto;
         padding: 10px 18px 18px;
       }
-      #bennett-ui-settings-dialog .codex-plus-row {
+      #better-ui-imropvement-ui-settings-dialog .codex-plus-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -9130,14 +9128,14 @@ function writeFlag(api, id, on) {
         padding: 14px 2px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       }
-      #bennett-ui-settings-dialog .codex-plus-row-title {
+      #better-ui-imropvement-ui-settings-dialog .codex-plus-row-title {
         font-weight: 650;
       }
-      #bennett-ui-settings-dialog .codex-plus-row-description {
+      #better-ui-imropvement-ui-settings-dialog .codex-plus-row-description {
         margin-top: 4px;
         line-height: 1.45;
       }
-      #bennett-ui-settings-dialog .bennett-ui-toggle {
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle {
         flex: 0 0 auto;
         width: 34px;
         height: 20px;
@@ -9147,10 +9145,10 @@ function writeFlag(api, id, on) {
         background: #3f4652;
         cursor: pointer;
       }
-      #bennett-ui-settings-dialog .bennett-ui-toggle[data-enabled="true"] {
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle[data-enabled="true"] {
         background: #2fbf8f;
       }
-      #bennett-ui-settings-dialog .bennett-ui-toggle span {
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle span {
         display: block;
         width: 16px;
         height: 16px;
@@ -9207,17 +9205,17 @@ function writeFlag(api, id, on) {
       window.removeEventListener("codex-sidecar-settings-select", handleSidecarSettingsSelect);
       document.removeEventListener("click", handleNativeSettingsNavigation, true);
       deactivateNativeSettingsPanel();
-      document.querySelectorAll('[data-codex-plus-tab="bennettUi"]').forEach((node) => node.remove());
-      document.querySelectorAll('[data-codex-plus-panel="bennettUi"]').forEach((node) => node.remove());
-      document.querySelectorAll('[data-sidecar-settings-nav="bennett-ui"]').forEach((node) => node.remove());
-      document.getElementById("bennett-ui-settings-launcher")?.remove();
-      document.getElementById("bennett-ui-settings-dialog")?.remove();
+      document.querySelectorAll('[data-codex-plus-tab="betterUiImropvement"]').forEach((node) => node.remove());
+      document.querySelectorAll('[data-codex-plus-panel="betterUiImropvement"]').forEach((node) => node.remove());
+      document.querySelectorAll('[data-sidecar-settings-nav="better-ui-imropvement-ui"]').forEach((node) => node.remove());
+      document.getElementById("better-ui-imropvement-ui-settings-launcher")?.remove();
+      document.getElementById("better-ui-imropvement-ui-settings-dialog")?.remove();
       const settingsModal = document.querySelector(".codex-plus-modal-content");
-      if (settingsModal?.dataset.bennettUiSettingsLoadId === SCRIPT_LOAD_ID) {
-        delete settingsModal.dataset.bennettUiSettingsLoadId;
-        delete settingsModal.dataset.bennettUiSettingsVersion;
+      if (settingsModal?.dataset.betterUiImropvementSettingsLoadId === SCRIPT_LOAD_ID) {
+        delete settingsModal.dataset.betterUiImropvementSettingsLoadId;
+        delete settingsModal.dataset.betterUiImropvementSettingsVersion;
       }
-      document.getElementById("bennett-ui-settings-style")?.remove();
+      document.getElementById("better-ui-imropvement-ui-settings-style")?.remove();
       document.getElementById(PINNED_THREAD_ICON_STYLE_ID)?.remove();
       if (typeof tweak.stop === "function") {
         tweak.stop.call(tweak);
@@ -9333,13 +9331,13 @@ function writeFlag(api, id, on) {
   }
 
   function createBigPizzaRendererApi() {
-    const storagePrefix = "bennett-ui-improvements:";
+    const storagePrefix = "better-ui-imropvement-ui-improvements:";
     const blockedFeatureKeys = new Set([
     ]);
     const noop = () => {};
     const logWith = (level) => (...args) => {
       const fn = console[level] || console.log || noop;
-      fn.call(console, "[Bennett UI/BigPizza]", ...args);
+      fn.call(console, "[Better UI Imropvement]", ...args);
     };
 
     const storage = {

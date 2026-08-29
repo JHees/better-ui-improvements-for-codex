@@ -1,8 +1,8 @@
 <div align="center">
 
-# Better UI Improvements for Codex
+# Better UI Imropvement for Codex
 
-**Bennett UI, maintained for Codex through Codex Script Loader.**
+**Interface and workflow improvements for Codex Script Loader.**
 
 [![Version](https://img.shields.io/badge/version-1.4.12-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -13,12 +13,10 @@
 
 </div>
 
-Bennett UI Improvements 1.4.12 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
-
-This project began as an adaptation of [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui). It preserves the original authorship and MIT license notices and is now maintained by [JHees](https://github.com/JHees) for Codex Script Loader.
+Better UI Imropvement 1.4.12 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final Bennett version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.12`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.12`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -29,7 +27,7 @@ This project began as an adaptation of [b-nnett/codex-plusplus-bennett-ui](https
 | History | Leaves ordinary and project conversations to Codex's native, independently scoped pagination. |
 | Markdown | Adds KaTeX formulas and local/relative images to `.md` previews while leaving tables, links, and layout to Codex. |
 | Thread actions | Adds compacted-context title regeneration, Markdown export, and confirmed permanent deletion to Codex's built-in thread menu while leaving native project movement in place. |
-| Settings | A dedicated Bennett UI panel with per-feature switches. |
+| Settings | A dedicated Better UI Imropvement panel with per-feature switches. |
 | Noise reduction | Hides Codex quota-exhaustion and Plus/Pro upgrade prompts while keeping the composer and app-update notices visible. |
 
 ## Install
@@ -44,9 +42,9 @@ Run `npm test` and `npm run check`, then create an installable ZIP with:
 npm run package
 ```
 
-Install the resulting `dist/bennett-ui-improvements-<version>.zip` from the Loader settings page. For development, the repository root is also a valid package folder because [`manifest.json`](manifest.json) points to the canonical [`scripts/bennett-ui-improvements.js`](scripts/bennett-ui-improvements.js). All source, manifest, tests, versions, and releases are owned by this repository.
+Install the resulting `dist/better-ui-imropvement-<version>.zip` from the Loader settings page. For development, the repository root is also a valid package folder because [`manifest.json`](manifest.json) points to the canonical [`scripts/better-ui-imropvement.js`](scripts/better-ui-imropvement.js). All source, manifest, tests, versions, and releases are owned by this repository.
 
-The package command also creates `dist/bennett-ui-improvements-<version>.zip.sha256`. Tagged stable releases publish both files. Previously installed `1.4.11` packages do not contain the update declaration, so they need one manual installation of the first future tagged update-aware ZIP. After that migration, Loader can discover later stable GitHub Releases. Automatic replacement remains an opt-in setting for this plugin; checking for updates does not enable it.
+The package command also creates `dist/better-ui-imropvement-<version>.zip.sha256`. Tagged stable releases publish both files. Packages using the previous identity must be removed before installing this independently identified plugin. Automatic replacement remains an opt-in setting; checking for updates does not enable it.
 
 ### Legacy Codex++ installations
 
@@ -75,10 +73,10 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 
 ## Native thread context actions
 
-- **Move to project** and **Remove from project** remain Codex-native operations. Bennett does not duplicate or replace them.
+- **Move to project** and **Remove from project** remain Codex-native operations. Better UI Imropvement does not duplicate or replace them.
 - **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks `gpt-5.6-luna` low for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
 - **Export Markdown** appears beside Codex's sharing and copy actions. It exports chronological user and assistant text plus local-image path markers, while excluding system/developer context, reasoning, and tool payloads.
-- **Delete permanently** appears at the bottom as a danger action. It requires an explicit confirmation and uses Codex's native `thread/delete`; there is no Bennett or Codex++ backup/undo path.
+- **Delete permanently** appears at the bottom as a danger action. It requires an explicit confirmation and uses Codex's native `thread/delete`; there is no plugin or Codex++ backup/undo path.
 - All three additions have independent switches. When any is active, obsolete Codex++ inline More/Delete buttons are hidden without affecting Codex's Pin or Archive controls.
 - These actions call the local Codex App Server directly and do not require the Codex++ session-delete bridge or helper service.
 
@@ -92,12 +90,12 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 
 ## Native conversation pagination
 
-Current Codex builds own conversation discovery, grouping, and pagination. Bennett no longer calls private history-refresh modules or exposes a separate history limit.
+Current Codex builds own conversation discovery, grouping, and pagination. Better UI Imropvement no longer calls private history-refresh modules or exposes a separate history limit.
 
 - **Recents** uses Codex's projectless infinite-scroll scope.
 - Every project uses its own project-scoped catalog and loads older conversations independently when the project is expanded.
 - Pinned conversations remain in Codex's separate pinned container.
-- When CC Switch unified session history is enabled, CC Switch/Codex still own the merge. Bennett neither reads session files nor creates a second conversation database.
+- When CC Switch unified session history is enabled, CC Switch/Codex still own the merge. Better UI Imropvement neither reads session files nor creates a second conversation database.
 
 ## Usage-data behavior
 
@@ -106,7 +104,7 @@ Current Codex builds own conversation discovery, grouping, and pagination. Benne
 - Five-hour and weekly views show remaining percentage and reset-time tooltips.
 - The quota control reads only the main account `rate_limit`; `additional_rate_limits` such as GPT-5.3 Codex-specific limits are excluded.
 - Credit appears only when actual credit data is available.
-- API or pure-API providers show `API`; Bennett does not fabricate ChatGPT quota values.
+- API or pure-API providers show `API`; Better UI Imropvement does not fabricate ChatGPT quota values.
 - The standalone `market-hide-usage-alert.js` script is no longer needed because that behavior is built in.
 
 ## Quota-prompt filtering
@@ -130,17 +128,18 @@ Markdown tables, links, wrapping, and column sizing remain Codex-native. Currenc
 
 ## Compatibility
 
-Bennett UI runs through Codex Script Loader and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases. Codex++ `1.2.4` is retained only as the historical final supported build; active compatibility work is limited to Codex Script Loader.
+Better UI Imropvement runs through Codex Script Loader and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases. Codex++ `1.2.4` is retained only as the historical final supported build; active compatibility work is limited to Codex Script Loader.
 
 ## Optional companion script
 
-[`scripts/hidden-user-message-visibility-fix.js`](scripts/hidden-user-message-visibility-fix.js) is an independent compatibility fix for user messages hidden by conversation compaction or steering-rendering issues. It is not part of the Bennett UI core script.
+[`scripts/hidden-user-message-visibility-fix.js`](scripts/hidden-user-message-visibility-fix.js) is an independent compatibility fix for user messages hidden by conversation compaction or steering-rendering issues. It is not part of the Better UI Imropvement core script.
 
 ## Credits and license
 
-- Original project: [b-nnett/codex-plusplus-bennett-ui](https://github.com/b-nnett/codex-plusplus-bennett-ui)
 - Active runtime: [JHees/codex-script-loader](https://github.com/JHees/codex-script-loader)
 - Legacy Codex++ market snapshot (`1.2.4`): [BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
 - Maintained repository: [JHees/better-ui-improvements-for-codex](https://github.com/JHees/better-ui-improvements-for-codex)
 
 Released under the [MIT License](LICENSE). Original copyright, attribution, and permission notices are preserved in the distributed script and [`NOTICE.md`](NOTICE.md).
+
+The interface design was informed by the open-source [Bennett UI plugin](https://github.com/b-nnett/codex-plusplus-bennett-ui). Thank you to its author and contributors for sharing their work.

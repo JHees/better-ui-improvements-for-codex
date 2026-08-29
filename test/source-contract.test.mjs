@@ -10,15 +10,16 @@ const manifest = JSON.parse(await readFile(path.join(repositoryRoot, "manifest.j
 const source = await readFile(path.join(repositoryRoot, manifest.main), "utf8");
 
 test("repository owns a self-contained Loader package contract", () => {
-  assert.equal(manifest.id, "co.bennett.ui-improvements");
+  assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
+  assert.equal(manifest.name, "Better UI Imropvement");
   assert.equal(manifest.version, "1.4.12");
-  assert.equal(manifest.lifecycleGlobal, "__bennettUiImprovementsBigPizza");
+  assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
   assert.deepEqual(manifest.update, {
     provider: "github-releases",
     repository: "JHees/better-ui-improvements-for-codex",
-    asset: "bennett-ui-improvements-{version}.zip",
+    asset: "better-ui-imropvement-{version}.zip",
   });
   assert.match(source, new RegExp(`const VERSION = "${manifest.version.replaceAll(".", "\\.")}"`, "u"));
   assert.match(source, /window\[INSTALL_KEY\] = \{/u);

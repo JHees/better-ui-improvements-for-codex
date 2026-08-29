@@ -14,7 +14,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 $repositoryPrefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 if (-not $outputRoot.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-  throw "OutputDirectory must remain inside the Bennett UI repository."
+  throw "OutputDirectory must remain inside the Better UI Imropvement repository."
 }
 
 $manifestPath = Join-Path $repositoryRoot "manifest.json"
@@ -37,12 +37,12 @@ if (-not $stagingPath.StartsWith($outputPrefix, [StringComparison]::OrdinalIgnor
   throw "Staging path escapes OutputDirectory."
 }
 
-$archivePath = Join-Path $outputRoot ("bennett-ui-improvements-{0}.zip" -f $manifest.version)
+$archivePath = Join-Path $outputRoot ("better-ui-imropvement-{0}.zip" -f $manifest.version)
 $checksumPath = "$archivePath.sha256"
 try {
   New-Item -ItemType Directory -Path (Join-Path $staging "scripts") -Force | Out-Null
   Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $staging "manifest.json")
-  Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $staging "scripts\bennett-ui-improvements.js")
+  Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $staging "scripts\better-ui-imropvement.js")
   foreach ($name in @("README.md", "README.zh-CN.md", "NOTICE.md", "LICENSE")) {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot $name) -Destination (Join-Path $staging $name)
   }

@@ -1,4 +1,4 @@
-name: Bennett UI package
+name: Better UI Imropvement package
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $manifest = Get-Content -LiteralPath "./manifest.json" -Raw | ConvertFrom-Json
           $package = Get-Content -LiteralPath "./package.json" -Raw | ConvertFrom-Json
-          $source = Get-Content -LiteralPath "./scripts/bennett-ui-improvements.js" -Raw
+          $source = Get-Content -LiteralPath "./scripts/better-ui-imropvement.js" -Raw
           $sourceVersion = [regex]::Match($source, 'const VERSION = "([^"]+)"').Groups[1].Value
           if ($manifest.version -ne $package.version -or $manifest.version -ne $sourceVersion) {
             throw "Manifest, package, and source versions must match."
@@ -42,7 +42,7 @@ jobs:
               throw "Release tag does not match the package version."
             }
           }
-          $zip = "./dist/bennett-ui-improvements-$($manifest.version).zip"
+          $zip = "./dist/better-ui-imropvement-$($manifest.version).zip"
           $sum = "$zip.sha256"
           $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $expected = "$actual  $([IO.Path]::GetFileName($zip))"
@@ -56,7 +56,7 @@ jobs:
             if (@($names | Where-Object { $_ -eq "manifest.json" }).Count -ne 1) {
               throw "Package must contain exactly one root manifest.json."
             }
-            if ($names -notcontains "scripts/bennett-ui-improvements.js") {
+            if ($names -notcontains "scripts/better-ui-imropvement.js") {
               throw "Package is missing its declared main script."
             }
           }
@@ -65,10 +65,10 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: bennett-ui-package
+          name: better-ui-imropvement-package
           path: |
-            dist/bennett-ui-improvements-*.zip
-            dist/bennett-ui-improvements-*.zip.sha256
+            dist/better-ui-imropvement-*.zip
+            dist/better-ui-imropvement-*.zip.sha256
           if-no-files-found: error
 
   release:
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: bennett-ui-package
+          name: better-ui-imropvement-package
           path: dist
       - name: Create or update GitHub Release
         env:
