@@ -20,12 +20,12 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.13";
+  const VERSION = "1.4.14";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
-  const LOADER_STORAGE_PREFIX = "codex-script-loader:co.bennett.ui-improvements:";
-  const RENAMED_LOADER_STORAGE_PREFIX = "codex-script-loader:io.github.jhees.better-ui-imropvement:";
+  const LOADER_STORAGE_PREFIX = "codex-script-loader:io.github.jhees.better-ui-imropvement:";
+  const LEGACY_LOADER_STORAGE_PREFIX = "codex-script-loader:co.bennett.ui-improvements:";
   const SCRIPT_LOAD_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lifecycleTimers = new Set();
   const lifecycleSignatures = new Set();
@@ -9273,7 +9273,7 @@ function writeFlag(api, id, on) {
     const baseStorage = baseApi.storage;
     const legacyKey = `${LEGACY_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
     const loaderKey = `${LOADER_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
-    const renamedLoaderKey = `${RENAMED_LOADER_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
+    const legacyLoaderKey = `${LEGACY_LOADER_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
 
     const readRecord = (key) => {
       try {
@@ -9306,7 +9306,7 @@ function writeFlag(api, id, on) {
     const readAndMigrate = (fallback) => {
       const legacy = readRecord(legacyKey);
       const loader = readRecord(loaderKey);
-      const renamedLoader = readRecord(renamedLoaderKey);
+      const legacyLoader = readRecord(legacyLoaderKey);
       const cache = window.__codexppSidebarProjectColorPrefs;
       const cached = cache && typeof cache === "object" && !Array.isArray(cache) ? cache : null;
       let active = null;
@@ -9318,12 +9318,12 @@ function writeFlag(api, id, on) {
       }
       const merged = {
         ...(legacy || {}),
-        ...(renamedLoader || {}),
+        ...(legacyLoader || {}),
         ...(loader || {}),
         ...(loader ? {} : active || {}),
         ...(cached || {}),
       };
-      if (!legacy && !loader && !renamedLoader && !active && !cached) return fallback;
+      if (!legacy && !loader && !legacyLoader && !active && !cached) return fallback;
       return writeBoth(merged);
     };
 
@@ -9343,7 +9343,7 @@ function writeFlag(api, id, on) {
         try {
           window.localStorage.removeItem(legacyKey);
           window.localStorage.removeItem(loaderKey);
-          window.localStorage.removeItem(renamedLoaderKey);
+          window.localStorage.removeItem(legacyLoaderKey);
         } catch {}
         try {
           baseStorage.delete(PROJECT_COLOR_STORAGE_KEY);

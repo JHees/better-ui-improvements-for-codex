@@ -8,11 +8,12 @@ import vm from "node:vm";
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 const manifest = JSON.parse(await readFile(path.join(repositoryRoot, "manifest.json"), "utf8"));
 const source = await readFile(path.join(repositoryRoot, manifest.main), "utf8");
+const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workflows/release.yml"), "utf8");
 
 test("repository owns a self-contained Loader package contract", () => {
-  assert.equal(manifest.id, "co.bennett.ui-improvements");
+  assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.4.13");
+  assert.equal(manifest.version, "1.4.14");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -22,8 +23,8 @@ test("repository owns a self-contained Loader package contract", () => {
     asset: "better-ui-imropvement-{version}.zip",
   });
   assert.match(source, new RegExp(`const VERSION = "${manifest.version.replaceAll(".", "\\.")}"`, "u"));
-  assert.match(source, /const LOADER_STORAGE_PREFIX = "codex-script-loader:co\.bennett\.ui-improvements:"/u);
-  assert.match(source, /const RENAMED_LOADER_STORAGE_PREFIX = "codex-script-loader:io\.github\.jhees\.better-ui-imropvement:"/u);
+  assert.match(source, /const LOADER_STORAGE_PREFIX = "codex-script-loader:io\.github\.jhees\.better-ui-imropvement:"/u);
+  assert.match(source, /const LEGACY_LOADER_STORAGE_PREFIX = "codex-script-loader:co\.bennett\.ui-improvements:"/u);
   assert.match(source, /window\[INSTALL_KEY\] = \{/u);
   assert.match(source, /stop\(\) \{/u);
   assert.match(source, /loaderApi\.settings\.registerPage/u);
@@ -32,6 +33,10 @@ test("repository owns a self-contained Loader package contract", () => {
     () => new vm.Script(`((module, exports, api) => {\n${source}\n})`),
     "the plugin source should compile inside the public Loader injection wrapper",
   );
+});
+
+test("tag releases bind GitHub CLI to the repository without a checkout", () => {
+  assert.match(releaseWorkflow, /GH_REPO:\s*\$\{\{ github\.repository \}\}/u);
 });
 
 test("current renderer compatibility behavior remains covered in this repository", () => {
