@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "co.bennett.ui-improvements",
   "name": "Better UI Imropvement",
-  "version": "1.4.12",
+  "version": "1.4.13",
   "main": "scripts/better-ui-imropvement.js",
   "scope": "renderer",
   "runAt": "document-start",

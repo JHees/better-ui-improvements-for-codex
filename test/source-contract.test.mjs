@@ -12,7 +12,7 @@ const source = await readFile(path.join(repositoryRoot, manifest.main), "utf8");
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "co.bennett.ui-improvements");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.4.12");
+  assert.equal(manifest.version, "1.4.13");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
