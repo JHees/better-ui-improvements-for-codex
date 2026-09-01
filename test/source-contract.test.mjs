@@ -70,3 +70,57 @@ test("feature identifiers are stable and owned by the plugin", () => {
     "thread-permanent-delete",
   ]);
 });
+
+test("current Codex thread menu factories remain discoverable", () => {
+  const legacyMarkers = source.match(
+    /const LEGACY_MENU_SOURCE_MARKERS = Object\.freeze\(\[(.*?)\]\);/su,
+  );
+  const factoryMatcher = source.match(
+    /function isThreadMenuFactorySource\(sourceText\) \{([\s\S]*?)\n  \}/u,
+  );
+  assert.ok(legacyMarkers, "legacy menu markers should remain declared");
+  assert.ok(factoryMatcher, "the thread menu factory compatibility matcher should exist");
+
+  const isThreadMenuFactorySource = vm.runInNewContext(`
+    const LEGACY_MENU_SOURCE_MARKERS = Object.freeze([${legacyMarkers[1]}]);
+    (function isThreadMenuFactorySource(sourceText) {${factoryMatcher[1]}\n  });
+  `);
+  const currentCodexFactory =
+    "()=>gLc({scope:T,surface:`sidebar`,isUnread:a??!1,target:{conversationId:n,hostId:M,cwd:xe},actions:re,canPin:x,onRename:Re,onArchive:Pe})";
+  const legacyCodexFactory =
+    "()=>['rename-thread','archive-thread','move-thread-to-project','copy-thread-actions']";
+
+  assert.equal(isThreadMenuFactorySource(currentCodexFactory), true);
+  assert.equal(isThreadMenuFactorySource(legacyCodexFactory), true);
+  assert.equal(isThreadMenuFactorySource("() => ['archive-thread']"), false);
+  assert.match(source, /"copy-actions"/u);
+  assert.match(source, /"window-separator"/u);
+});
+
+test("thread action switches remain in the settings page", () => {
+  const editorGroup = source.match(
+    /id:\s*"editor",\s*title:\s*"编辑与会话",\s*features:\s*\[(.*?)\]/su,
+  );
+  assert.ok(editorGroup, "the editor and thread settings group should exist");
+  const featureIds = [...editorGroup[1].matchAll(/"([a-z0-9-]+)"/gu)].map(match => match[1]);
+  assert.deepEqual(featureIds, [
+    "render-markdown-preview-math",
+    "slash-menu-polish",
+    "thread-title-regeneration",
+    "thread-markdown-export",
+    "thread-permanent-delete",
+  ]);
+  assert.match(
+    source,
+    /data-better-ui-imropvement-ui-feature="\$\{escapeAttr\(item\.id\)\}"/u,
+  );
+  assert.match(source, /role="switch"/u);
+});
+
+test("permanent delete uses the native destructive menu variant", () => {
+  assert.match(
+    source,
+    /id:\s*DELETE_ITEM_ID,[\s\S]{0,500}?variant:\s*"destructive"/u,
+    "the permanent-delete item should request Codex's native destructive variant",
+  );
+});

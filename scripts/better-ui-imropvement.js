@@ -261,12 +261,23 @@ function createSessionThreadActionsManager() {
   const DELETE_SEPARATOR_ID = "better-ui-imropvement-thread-danger-separator";
   const DELETE_ITEM_ID = "better-ui-imropvement-thread-delete-permanently";
   const LOCAL_THREAD_ID_PATTERN = /^(?:urn:uuid:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
-  const MENU_SOURCE_MARKERS = [
+  const LEGACY_MENU_SOURCE_MARKERS = Object.freeze([
     "rename-thread",
     "archive-thread",
     "move-thread-to-project",
     "copy-thread-actions",
-  ];
+  ]);
+  function isThreadMenuFactorySource(sourceText) {
+    const value = String(sourceText || "");
+    if (LEGACY_MENU_SOURCE_MARKERS.every((marker) => value.includes(marker))) return true;
+    const targetsSidebar = value.includes("surface:`sidebar`") ||
+      value.includes('surface:"sidebar"') || value.includes("surface:'sidebar'");
+    return targetsSidebar &&
+      value.includes("conversationId:") &&
+      value.includes("hostId:") &&
+      value.includes("onRename:") &&
+      value.includes("onArchive:");
+  }
   const enabledActions = new Set();
   const patchedMenuRefs = new Map();
   const uiTimers = new Set();
@@ -676,7 +687,7 @@ function createSessionThreadActionsManager() {
         try {
           source = Function.prototype.toString.call(candidate);
         } catch {}
-        if (MENU_SOURCE_MARKERS.every((marker) => source.includes(marker))) return ref;
+        if (isThreadMenuFactorySource(source)) return ref;
       }
     }
     return null;
@@ -716,8 +727,12 @@ function createSessionThreadActionsManager() {
         message: nativeMessage("exportMarkdown", text.export),
         onSelect: () => void exportThread(context),
       };
-      const copyIndex = next.findIndex((item) => item?.id === "copy-thread-actions");
-      const newWindowIndex = next.findIndex((item) => item?.id === "new-window-separator");
+      const copyIndex = next.findIndex((item) =>
+        ["copy-actions", "copy-thread-actions"].includes(item?.id),
+      );
+      const newWindowIndex = next.findIndex((item) =>
+        ["window-separator", "new-window-separator"].includes(item?.id),
+      );
       const insertAt = copyIndex >= 0 ? copyIndex : newWindowIndex >= 0 ? newWindowIndex : next.length;
       next.splice(insertAt, 0, exportItem);
     }
@@ -730,6 +745,7 @@ function createSessionThreadActionsManager() {
         id: DELETE_ITEM_ID,
         icon: DELETE_ICON,
         message: nativeMessage("deletePermanently", text.delete),
+        variant: "destructive",
         destructive: true,
         danger: true,
         tone: "danger",
