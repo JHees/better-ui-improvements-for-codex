@@ -24,7 +24,8 @@
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
-  const LOADER_STORAGE_PREFIX = "codex-script-loader:io.github.jhees.better-ui-imropvement:";
+  const LOADER_STORAGE_PREFIX = "codex-script-loader:co.bennett.ui-improvements:";
+  const RENAMED_LOADER_STORAGE_PREFIX = "codex-script-loader:io.github.jhees.better-ui-imropvement:";
   const SCRIPT_LOAD_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const lifecycleTimers = new Set();
   const lifecycleSignatures = new Set();
@@ -370,14 +371,30 @@ function createSessionThreadActionsManager() {
     description: "Better UI Imropvement native thread context action",
   });
 
-  const svgIcon = (path) => {
-    const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${path}" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const svgIcon = (path, stroke = "currentColor") => {
+    const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${path}" stroke="${stroke}" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   };
 
+  function systemDangerColor() {
+    const root = document.body ?? document.documentElement;
+    if (root) {
+      const probe = document.createElement("span");
+      probe.className = "text-danger";
+      probe.style.cssText = "position:fixed;left:-10000px;top:-10000px;pointer-events:none;visibility:hidden";
+      root.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+    }
+    return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches
+      ? "rgb(255, 133, 73)"
+      : "rgb(226, 85, 7)";
+  }
+
   const REGENERATE_ICON = svgIcon("M10 2.75v2.5m0 9.5v2.5M2.75 10h2.5m9.5 0h2.5M4.88 4.88l1.77 1.77m6.7 6.7 1.77 1.77m0-10.24-1.77 1.77m-6.7 6.7-1.77 1.77M10 6.75A3.25 3.25 0 1 1 10 13.25 3.25 3.25 0 0 1 10 6.75");
   const EXPORT_ICON = svgIcon("M10 2.75v9.5m0 0 3.25-3.25M10 12.25 6.75 9M4 13.75v1.5A2 2 0 0 0 6 17.25h8a2 2 0 0 0 2-2v-1.5");
-  const DELETE_ICON = svgIcon("M3.75 5.25h12.5M8 2.75h4l.75 2.5M6 7.5l.5 8.25h7L14 7.5M8.5 9.25v4.5m3-4.5v4.5");
+  const DELETE_ICON_PATH = "M3.75 5.25h12.5M8 2.75h4l.75 2.5M6 7.5l.5 8.25h7L14 7.5M8.5 9.25v4.5m3-4.5v4.5";
 
   function ensureStyle() {
     document.getElementById(STYLE_ID)?.remove();
@@ -743,9 +760,8 @@ function createSessionThreadActionsManager() {
       }
       next.push({
         id: DELETE_ITEM_ID,
-        icon: DELETE_ICON,
+        icon: svgIcon(DELETE_ICON_PATH, systemDangerColor()),
         message: nativeMessage("deletePermanently", text.delete),
-        variant: "destructive",
         destructive: true,
         danger: true,
         tone: "danger",
@@ -9257,6 +9273,7 @@ function writeFlag(api, id, on) {
     const baseStorage = baseApi.storage;
     const legacyKey = `${LEGACY_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
     const loaderKey = `${LOADER_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
+    const renamedLoaderKey = `${RENAMED_LOADER_STORAGE_PREFIX}${PROJECT_COLOR_STORAGE_KEY}`;
 
     const readRecord = (key) => {
       try {
@@ -9289,6 +9306,7 @@ function writeFlag(api, id, on) {
     const readAndMigrate = (fallback) => {
       const legacy = readRecord(legacyKey);
       const loader = readRecord(loaderKey);
+      const renamedLoader = readRecord(renamedLoaderKey);
       const cache = window.__codexppSidebarProjectColorPrefs;
       const cached = cache && typeof cache === "object" && !Array.isArray(cache) ? cache : null;
       let active = null;
@@ -9300,11 +9318,12 @@ function writeFlag(api, id, on) {
       }
       const merged = {
         ...(legacy || {}),
+        ...(renamedLoader || {}),
         ...(loader || {}),
         ...(loader ? {} : active || {}),
         ...(cached || {}),
       };
-      if (!legacy && !loader && !active && !cached) return fallback;
+      if (!legacy && !loader && !renamedLoader && !active && !cached) return fallback;
       return writeBoth(merged);
     };
 
@@ -9324,6 +9343,7 @@ function writeFlag(api, id, on) {
         try {
           window.localStorage.removeItem(legacyKey);
           window.localStorage.removeItem(loaderKey);
+          window.localStorage.removeItem(renamedLoaderKey);
         } catch {}
         try {
           baseStorage.delete(PROJECT_COLOR_STORAGE_KEY);

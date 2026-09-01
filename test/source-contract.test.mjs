@@ -10,7 +10,7 @@ const manifest = JSON.parse(await readFile(path.join(repositoryRoot, "manifest.j
 const source = await readFile(path.join(repositoryRoot, manifest.main), "utf8");
 
 test("repository owns a self-contained Loader package contract", () => {
-  assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
+  assert.equal(manifest.id, "co.bennett.ui-improvements");
   assert.equal(manifest.name, "Better UI Imropvement");
   assert.equal(manifest.version, "1.4.12");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
@@ -22,6 +22,8 @@ test("repository owns a self-contained Loader package contract", () => {
     asset: "better-ui-imropvement-{version}.zip",
   });
   assert.match(source, new RegExp(`const VERSION = "${manifest.version.replaceAll(".", "\\.")}"`, "u"));
+  assert.match(source, /const LOADER_STORAGE_PREFIX = "codex-script-loader:co\.bennett\.ui-improvements:"/u);
+  assert.match(source, /const RENAMED_LOADER_STORAGE_PREFIX = "codex-script-loader:io\.github\.jhees\.better-ui-imropvement:"/u);
   assert.match(source, /window\[INSTALL_KEY\] = \{/u);
   assert.match(source, /stop\(\) \{/u);
   assert.match(source, /loaderApi\.settings\.registerPage/u);
@@ -117,10 +119,21 @@ test("thread action switches remain in the settings page", () => {
   assert.match(source, /role="switch"/u);
 });
 
-test("permanent delete uses the native destructive menu variant", () => {
-  assert.match(
-    source,
-    /id:\s*DELETE_ITEM_ID,[\s\S]{0,500}?variant:\s*"destructive"/u,
-    "the permanent-delete item should request Codex's native destructive variant",
+test("permanent delete follows the system danger styling contract", () => {
+  const deleteItem = source.match(
+    /id:\s*DELETE_ITEM_ID,[\s\S]{0,500}?onSelect:\s*\(\) => void deleteThreadPermanently\(context\)/u,
   );
+  assert.ok(deleteItem, "the permanent-delete menu item should exist");
+  assert.doesNotMatch(
+    deleteItem[0],
+    /variant:\s*"destructive"/u,
+    "Codex's menu item variant must stay at its default so danger tone can apply",
+  );
+  assert.match(
+    deleteItem[0],
+    /icon:\s*svgIcon\(DELETE_ICON_PATH,\s*systemDangerColor\(\)\)/u,
+    "Electron's native menu should receive a system-danger-colored trash icon",
+  );
+  assert.match(deleteItem[0], /tone:\s*"danger"/u);
+  assert.match(source, /function systemDangerColor\(\)/u);
 });

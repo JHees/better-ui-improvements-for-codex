@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.jhees.better-ui-imropvement",
+  "id": "co.bennett.ui-improvements",
   "name": "Better UI Imropvement",
   "version": "1.4.12",
   "main": "scripts/better-ui-imropvement.js",
