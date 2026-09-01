@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.14";
+  const VERSION = "1.4.15";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -8682,13 +8682,13 @@ function writeFlag(api, id, on) {
       description: "",
       iconSvg: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm inline-block align-middle" aria-hidden="true"><path d="M10 2.5 11.4 8.6 17.5 10l-6.1 1.4L10 17.5l-1.4-6.1L2.5 10l6.1-1.4L10 2.5Z" fill="currentColor"/></svg>',
       render(root) {
-        root.dataset.betterUiImropvementSettingsRoot = "true";
+        root.dataset.betterUiImropvementUiSettingsRoot = "true";
         root.innerHTML = settingsPanelHtml();
         bindSettingsPanel(root);
         ensureSettingsStyle();
         refreshSettingsPanel(root);
         return () => {
-          delete root.dataset.betterUiImropvementSettingsRoot;
+          delete root.dataset.betterUiImropvementUiSettingsRoot;
           root.innerHTML = "";
         };
       },

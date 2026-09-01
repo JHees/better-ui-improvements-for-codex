@@ -13,7 +13,7 @@ const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workfl
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.4.14");
+  assert.equal(manifest.version, "1.4.15");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -122,6 +122,24 @@ test("thread action switches remain in the settings page", () => {
     /data-better-ui-imropvement-ui-feature="\$\{escapeAttr\(item\.id\)\}"/u,
   );
   assert.match(source, /role="switch"/u);
+});
+
+test("settings root attribute scopes the switch styles", () => {
+  assert.match(
+    source,
+    /root\.dataset\.betterUiImropvementUiSettingsRoot = "true"/u,
+    "the rendered settings root must expose the data attribute used by its scoped CSS",
+  );
+  assert.match(
+    source,
+    /delete root\.dataset\.betterUiImropvementUiSettingsRoot/u,
+    "the matching settings-root data attribute should be removed during cleanup",
+  );
+  assert.match(
+    source,
+    /\[data-better-ui-imropvement-ui-settings-root="true"\] \.better-ui-imropvement-ui-toggle/u,
+    "switch dimensions and colors must be scoped to the rendered settings root",
+  );
 });
 
 test("permanent delete follows the system danger styling contract", () => {
