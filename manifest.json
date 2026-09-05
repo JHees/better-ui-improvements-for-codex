@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.jhees.better-ui-imropvement",
   "name": "Better UI Imropvement",
-  "version": "1.4.15",
+  "version": "1.4.16",
   "main": "scripts/better-ui-imropvement.js",
   "scope": "renderer",
   "runAt": "document-start",

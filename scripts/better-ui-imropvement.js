@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.15";
+  const VERSION = "1.4.16";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -82,7 +82,7 @@
     {
       id: "thread-title-regeneration",
       title: "会话标题重新生成",
-      detail: "在临时分支中压缩完整会话，再由 Luna low 根据压缩上下文重新生成标题。",
+      detail: "在临时分支中压缩完整会话，再由所选模型根据压缩上下文重新生成标题。",
       defaultEnabled: true,
       status: "本地普通会话可用；不会修改原会话上下文",
     },
@@ -165,7 +165,7 @@
  *  • sidebar-conversation-colors Color conversation rows by their native
  *                                 project association.
  *  • thread-title-regeneration Use a system-scoped temporary working fork,
- *                               compact it, then ask Luna low to title it.
+ *                               compact it, then ask the selected model to title it.
  *  • thread-markdown-export Export user and assistant messages from the
  *                            native thread menu through Codex App Server.
  *  • thread-permanent-delete Permanently delete a local thread after an
@@ -252,6 +252,119 @@ const SESSION_ACTION_EXPORT = "export";
 const SESSION_ACTION_DELETE = "delete";
 const sessionThreadActions = createSessionThreadActionsManager();
 
+function createTitleModelSettings({ storage, loadModels, onChange, setTimer, clearTimer }) {
+  const storageKey = "title-generation:model";
+  const defaultModel = "gpt-5.4-mini";
+  let models = [];
+  let status = "loading";
+  let error = "";
+  let pending = null;
+  let stopped = false;
+  let retryTimer = null;
+  let requestTimer = null;
+  let cancelRequest = null;
+  const selectedModel = () => storage.get(storageKey, defaultModel) || defaultModel;
+  const snapshot = () => ({ models: models.slice(), status, error, selectedModel: selectedModel() });
+  const notify = () => { if (!stopped) onChange(snapshot()); };
+  function refresh() {
+    if (stopped) return Promise.resolve([]);
+    if (pending) return pending;
+    if (retryTimer !== null) clearTimer(retryTimer);
+    retryTimer = null;
+    status = "loading";
+    error = "";
+    notify();
+    pending = (async () => {
+      try {
+        const result = await Promise.race([
+          Promise.resolve().then(loadModels),
+          new Promise((_, reject) => {
+            cancelRequest = () => reject(new Error("Model list request cancelled"));
+            requestTimer = setTimer(() => reject(new Error("Model list request timed out")), 15000);
+          }),
+        ]);
+        if (stopped) return [];
+        models = result;
+        status = "ready";
+        return models;
+      } catch (cause) {
+        if (!stopped) {
+          status = "error";
+          error = cause?.message || String(cause);
+        }
+        return [];
+      } finally {
+        if (requestTimer !== null) clearTimer(requestTimer);
+        requestTimer = null;
+        cancelRequest = null;
+        pending = null;
+        notify();
+      }
+    })();
+    return pending;
+  }
+  async function startup(attempt = 0) {
+    await refresh();
+    const delays = [500, 1500, 3500, 8000];
+    if (!stopped && status === "error" && attempt < delays.length) {
+      retryTimer = setTimer(() => { retryTimer = null; void startup(attempt + 1); }, delays[attempt]);
+    }
+  }
+  return {
+    selectedModel,
+    snapshot,
+    refresh,
+    start: () => { void startup(); },
+    select(model) {
+      if (stopped || !models.some((entry) => entry.model === model)) return false;
+      storage.set(storageKey, model);
+      notify();
+      return true;
+    },
+    async resolve(model) {
+      if (status !== "ready") await refresh();
+      if (stopped) throw new Error("Title model settings stopped");
+      if (status !== "ready") throw new Error(`无法读取标题模型列表：${error}`);
+      const entry = models.find((candidate) => candidate.model === model);
+      if (!entry) throw new Error(`标题模型 ${model} 当前不可用，请在设置中重新选择`);
+      const supportsLow = entry.supportedReasoningEfforts?.some((option) => option.reasoningEffort === "low");
+      return { model: entry.model, effort: supportsLow ? "low" : entry.defaultReasoningEffort ?? null };
+    },
+    stop() {
+      stopped = true;
+      if (retryTimer !== null) clearTimer(retryTimer);
+      retryTimer = null;
+      if (requestTimer !== null) clearTimer(requestTimer);
+      requestTimer = null;
+      cancelRequest?.();
+    },
+  };
+}
+
+async function readTitleModels(client) {
+  const models = new Map();
+  const cursors = new Set();
+  let cursor = null;
+  do {
+    const response = await client.sendRequest("model/list", { limit: 100, includeHidden: false, cursor });
+    const page = response?.result || response;
+    if (!Array.isArray(page?.data)) throw new Error("Invalid Codex model list");
+    for (const entry of page.data) {
+      if (entry?.hidden || typeof entry?.model !== "string" || !entry.model.trim()) continue;
+      models.set(entry.model, {
+        model: entry.model,
+        displayName: entry.displayName || entry.model,
+        supportedReasoningEfforts: entry.supportedReasoningEfforts,
+        defaultReasoningEffort: entry.defaultReasoningEffort,
+      });
+    }
+    cursor = page.nextCursor;
+    if (cursor && cursors.has(cursor)) throw new Error("Repeated Codex model list cursor");
+    if (cursor) cursors.add(cursor);
+  } while (cursor);
+  return Array.from(models.values());
+}
+
 function createSessionThreadActionsManager() {
   const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row]";
   const STYLE_ID = "better-ui-imropvement-thread-context-actions-style";
@@ -328,7 +441,7 @@ function createSessionThreadActionsManager() {
         titleUnchanged: "无变化 · {title}",
         titleChanged: "未覆盖 · {title} 已被修改",
         titleError: "失败 · {title}：{error}",
-        titleUnavailable: "Luna low 未返回可用标题",
+        titleUnavailable: "所选模型未返回可用标题",
         compactionFailed: "临时会话压缩失败",
         busyThread: "请等待会话完成后再重新生成标题",
         exporting: "正在导出会话…",
@@ -354,7 +467,7 @@ function createSessionThreadActionsManager() {
         titleUnchanged: "Unchanged · {title}",
         titleChanged: "Not overwritten · {title} changed",
         titleError: "Failed · {title}: {error}",
-        titleUnavailable: "Luna low did not return a usable title",
+        titleUnavailable: "The selected model did not return a usable title",
         compactionFailed: "The temporary chat could not be compacted",
         busyThread: "Wait for the chat to finish before regenerating its title",
         exporting: "Exporting chat…",
@@ -826,10 +939,12 @@ function createSessionThreadActionsManager() {
     }, delay);
   }
 
-  function scopeFromRow(row) {
+  function scopeFromRow(row, visited = null) {
     const requiredFunctions = ["get", "set", "watch", "when"];
     const candidates = [];
     for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 20; depth += 1, fiber = fiber.return) {
+      if (visited?.has(fiber)) break;
+      visited?.add(fiber);
       for (const candidateFiber of [fiber, fiber.alternate]) {
         let hook = candidateFiber?.memoizedState;
         for (let index = 0; hook && index < 160; index += 1, hook = hook.next) {
@@ -843,6 +958,19 @@ function createSessionThreadActionsManager() {
       "query" in candidate && "queryClient" in candidate &&
       requiredFunctions.every((key) => typeof candidate[key] === "function"),
     ) || null;
+  }
+
+  function nativeScopeElement() {
+    const visited = new Set();
+    for (const element of document.querySelectorAll(THREAD_SELECTOR)) {
+      if (scopeFromRow(element, visited)) return element;
+    }
+    // Settings and empty home pages may have no sidebar thread rows.
+    // Inspect each React ancestor once to find the same app service scope.
+    for (const element of document.querySelectorAll("body *")) {
+      if (scopeFromRow(element, visited)) return element;
+    }
+    return null;
   }
 
   function localModuleUrl(value) {
@@ -1508,6 +1636,8 @@ function createSessionThreadActionsManager() {
     const key = `${SESSION_ACTION_REGENERATE_TITLE}:${context.threadKey}`;
     if (inFlight.has(key)) return;
     inFlight.add(key);
+    const selectedTitleModel = titleModelSettings.selectedModel();
+    let titleModel = null;
     schedulePatch(0);
     const epoch = operationEpoch;
     let client = null;
@@ -1524,6 +1654,8 @@ function createSessionThreadActionsManager() {
       progressToast.update(message, tone, timeout);
     };
     try {
+      titleModel = await titleModelSettings.resolve(selectedTitleModel);
+      if (epoch !== operationEpoch) return { status: "cancelled" };
       client = await nativeClientFor(context);
       const sourceResponse = await client.sendRequest("thread/read", {
         threadId: context.threadId,
@@ -1591,13 +1723,14 @@ function createSessionThreadActionsManager() {
           approvalPolicy: "never",
           permissions: ":read-only",
           runtimeWorkspaceRoots: [],
-          model: "gpt-5.6-luna",
-          effort: "low",
+          model: titleModel.model,
+          effort: titleModel.effort,
           serviceTier: null,
           personality: null,
           outputSchema: TITLE_OUTPUT_SCHEMA,
           collaborationMode: null,
         });
+        log("info", "title generation started", { ...titleModel, workingThreadId });
       } catch (error) {
         throw error;
       }
@@ -1634,7 +1767,7 @@ function createSessionThreadActionsManager() {
           "info",
           3800,
         );
-        return { status: "unchanged", originalTitle, title: generatedTitle };
+        return { status: "unchanged", originalTitle, title: generatedTitle, ...titleModel };
       }
       await client.sendRequest("thread/name/set", {
         threadId: context.threadId,
@@ -1645,7 +1778,7 @@ function createSessionThreadActionsManager() {
           .replace("{title}", compactProgressText(generatedTitle)),
         "success",
       );
-      return { status: "updated", originalTitle, title: generatedTitle };
+      return { status: "updated", originalTitle, title: generatedTitle, ...titleModel };
     } catch (error) {
       if (epoch !== operationEpoch || error?.name === "AbortError") {
         return { status: "cancelled" };
@@ -1857,6 +1990,11 @@ function createSessionThreadActionsManager() {
   }
 
   return {
+    async listTitleModels() {
+      const row = nativeScopeElement();
+      if (!row) throw new Error("Codex model client is not ready");
+      return readTitleModels(await nativeClientFor({ row, hostId: "local" }));
+    },
     enable(action, nextApi) {
       api = nextApi || api;
       const wasEmpty = enabledActions.size === 0;
@@ -8657,6 +8795,13 @@ function writeFlag(api, id, on) {
   tweak.start.call(tweak, rendererApi);
   const features = FEATURE_IDS;
   const featureInfo = FEATURE_DEFINITIONS;
+  const titleModelSettings = createTitleModelSettings({
+    storage: rendererApi.storage,
+    loadModels: () => sessionThreadActions.listTitleModels(),
+    onChange: () => refreshTitleModelControls(),
+    setTimer: (callback, delay) => window.setTimeout(callback, delay),
+    clearTimer: (timer) => window.clearTimeout(timer),
+  });
   let settingsScanTimer = 0;
   let nativeSettingsActive = false;
   let settingsObserver = null;
@@ -8770,8 +8915,18 @@ function writeFlag(api, id, on) {
   }
 
   function bindSettingsPanel(panel) {
+    panel.addEventListener("change", (event) => {
+      if (event.target?.matches?.("[data-better-ui-title-model]")) {
+        titleModelSettings.select(event.target.value);
+      }
+    });
     panel.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+      if (target?.closest("[data-better-ui-title-model-retry]")) {
+        event.preventDefault();
+        void titleModelSettings.refresh();
+        return;
+      }
       const toggle = target?.closest("[data-better-ui-imropvement-ui-feature]");
       if (!toggle) return;
       event.preventDefault();
@@ -8899,7 +9054,7 @@ function writeFlag(api, id, on) {
     const badges = {
       "show-usage-in-sidebar": "需额度数据",
       "render-markdown-preview-math": "LaTeX",
-      "thread-title-regeneration": "Luna low",
+      "thread-title-regeneration": "可选模型",
       "thread-markdown-export": "本地会话",
       "thread-permanent-delete": "不可撤销",
     };
@@ -8921,6 +9076,15 @@ function writeFlag(api, id, on) {
                       ${badges[item.id] ? `<span class="better-ui-imropvement-ui-feature-badge" data-tone="${item.id === "thread-permanent-delete" ? "danger" : "neutral"}">${escapeHtmlLocal(badges[item.id])}</span>` : ""}
                     </div>
                     <div class="codex-plus-row-description text-sm text-secondary">${escapeHtmlLocal(item.detail)}</div>
+                    ${item.id === "thread-title-regeneration" ? `
+                      <div class="better-ui-title-model-control">
+                        <label class="text-sm text-default">标题生成默认模型
+                          <select data-better-ui-title-model aria-label="标题生成默认模型" disabled></select>
+                        </label>
+                        <div class="text-xs text-secondary" data-better-ui-title-model-status role="status"></div>
+                        <button type="button" class="text-sm text-default" data-better-ui-title-model-retry hidden>重新读取模型列表</button>
+                      </div>
+                    ` : ""}
                   </div>
                   <button type="button" role="switch" aria-label="${escapeAttr(item.title)}" aria-checked="false" class="codex-plus-toggle better-ui-imropvement-ui-toggle" data-better-ui-imropvement-ui-feature="${escapeAttr(item.id)}" ${item.disabled ? "disabled" : ""}><span></span></button>
                 </div>
@@ -8934,6 +9098,7 @@ function writeFlag(api, id, on) {
   }
 
   function refreshSettingsPanel(root = document) {
+    refreshTitleModelControls(root);
     for (const item of featureInfo) {
       const row = root.querySelector(`[data-better-ui-imropvement-ui-row="${cssEscape(item.id)}"]`);
       const toggle = row?.querySelector("[data-better-ui-imropvement-ui-feature]");
@@ -8945,11 +9110,39 @@ function writeFlag(api, id, on) {
     }
   }
 
+  function refreshTitleModelControls(root = document) {
+    const state = titleModelSettings.snapshot();
+    for (const select of root.querySelectorAll("[data-better-ui-title-model]")) {
+      const available = state.models.some((entry) => entry.model === state.selectedModel);
+      select.innerHTML = (available ? "" : `<option value="${escapeAttr(state.selectedModel)}">${escapeHtmlLocal(state.selectedModel)}${state.status === "ready" ? "（当前不可用）" : ""}</option>`) +
+        state.models.map((entry) => `<option value="${escapeAttr(entry.model)}">${escapeHtmlLocal(entry.displayName)}</option>`).join("");
+      select.value = state.selectedModel;
+      select.disabled = state.status !== "ready" || state.models.length === 0;
+      const control = select.closest(".better-ui-title-model-control");
+      const status = control.querySelector("[data-better-ui-title-model-status]");
+      status.textContent = state.status === "loading" ? "正在从 Codex 读取模型列表…" :
+        state.status === "error" ? `读取失败：${state.error}` :
+          !available ? "所选模型当前不可用，请选择其他模型。" : "每次启动重新读取；仅用于压缩后的标题生成。";
+      const retry = control.querySelector("[data-better-ui-title-model-retry]");
+      retry.hidden = state.status === "loading";
+    }
+  }
+
   function ensureSettingsStyle() {
     if (document.getElementById("better-ui-imropvement-ui-settings-style")) return;
     const style = document.createElement("style");
     style.id = "better-ui-imropvement-ui-settings-style";
     style.textContent = `
+      .better-ui-title-model-control { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+      .better-ui-title-model-control label { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      .better-ui-title-model-control select {
+        min-width: 160px; max-width: 100%; padding: 6px 10px; border-radius: 8px;
+        color: inherit; background: var(--color-background-primary, Canvas);
+        border: 1px solid var(--color-border-default, rgba(127,127,127,.28)); font: inherit;
+      }
+      .better-ui-title-model-control select:focus-visible { outline: 2px solid var(--color-chart-blue, #3b82f6); outline-offset: 2px; }
+      .better-ui-title-model-control button { align-self: flex-start; text-decoration: underline; }
+      .better-ui-title-model-control [hidden] { display: none; }
       [data-better-ui-imropvement-ui-settings-root="true"] {
         display: block;
         width: 100%;
@@ -9218,7 +9411,7 @@ function writeFlag(api, id, on) {
     features,
     featureInfo,
     threadActionsStatus() {
-      return sessionThreadActions.status();
+      return { ...sessionThreadActions.status(), titleModels: titleModelSettings.snapshot() };
     },
     regenerateLocalThreadTitle(threadId) {
       return sessionThreadActions.regenerateLocalThreadTitle(threadId);
@@ -9228,6 +9421,7 @@ function writeFlag(api, id, on) {
       if (reload) window.location.reload();
     },
     stop() {
+      titleModelSettings.stop();
       for (const timer of lifecycleTimers) window.clearTimeout(timer);
       lifecycleTimers.clear();
       settingsObserver?.disconnect();
@@ -9255,6 +9449,7 @@ function writeFlag(api, id, on) {
     },
   };
 
+  titleModelSettings.start();
   reportLifecycle("script-loaded", {
     readyState: document.readyState,
     activeFeatures: Array.from(tweak._state?.features?.keys?.() || []),

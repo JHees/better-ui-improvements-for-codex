@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.15-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.16-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,10 +13,10 @@
 
 </div>
 
-Better UI Imropvement 1.4.15 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.4.16 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.15`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.16`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -61,7 +61,7 @@ Codex++ users may continue using the market's frozen `1.2.4` build, but it is un
 | Hide Plus/Pro upgrade prompts | On | Stable; Codex app-update notices remain visible |
 | Formula and local-image preview | On | Stable for `.md` and `.markdown` previews; native tables are untouched |
 | Slash-menu polish | On | Stable |
-| Thread title regeneration | On | Local non-ephemeral threads; compacts a temporary fork before using Luna low |
+| Thread title regeneration | On | Local non-ephemeral threads; compacts a temporary fork before using the selected model (default: GPT-5.4-Mini) |
 | Thread Markdown export | On | Local non-ephemeral threads; uses the native Codex App Server |
 | Thread permanent deletion | On | Local non-ephemeral threads; irreversible and explicitly confirmed |
 
@@ -74,7 +74,8 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 ## Native thread context actions
 
 - **Move to project** and **Remove from project** remain Codex-native operations. Better UI Imropvement does not duplicate or replace them.
-- **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks `gpt-5.6-luna` low for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
+- **Title generation default model** is selectable beneath the title-regeneration switch. The plugin reads Codex’s visible model list on every startup/reload and saves your selection locally. It prefers `low` reasoning when supported, otherwise the model’s default. The choice only affects title generation after compaction. Loading failures offer a retry; unavailable selections remain saved and require choosing an available model.
+- **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks the selected model (initial default: `gpt-5.4-mini`) for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
 - **Export Markdown** appears beside Codex's sharing and copy actions. It exports chronological user and assistant text plus local-image path markers, while excluding system/developer context, reasoning, and tool payloads.
 - **Delete permanently** appears at the bottom as a danger action. It requires an explicit confirmation and uses Codex's native `thread/delete`; there is no plugin or Codex++ backup/undo path.
 - All three additions have independent switches. When any is active, obsolete Codex++ inline More/Delete buttons are hidden without affecting Codex's Pin or Archive controls.

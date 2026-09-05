@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.4.15-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.16-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,10 +13,10 @@
 
 </div>
 
-Better UI Imropvement 1.4.15 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.4.16 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.15`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.16`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -61,7 +61,7 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 | 隐藏 Plus/Pro 升级提示 | 开启 | 稳定；保留 Codex 软件更新提示 |
 | 公式与本地图片预览 | 开启 | 对 `.md` 和 `.markdown` 预览稳定可用；不接管原生表格 |
 | 斜杠菜单优化 | 开启 | 稳定 |
-| 会话标题重新生成 | 开启 | 本地非临时会话；在临时分支压缩完整上下文后使用 Luna low |
+| 会话标题重新生成 | 开启 | 本地非临时会话；在临时分支压缩完整上下文后使用所选模型（默认 GPT-5.4-Mini） |
 | 会话 Markdown 导出 | 开启 | 本地非临时会话；直接使用 Codex 原生 App Server |
 | 会话永久删除 | 开启 | 本地非临时会话；不可恢复且必须明确确认 |
 
@@ -74,7 +74,8 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 ## 原生会话右键操作
 
 - **移动到项目**和**移出项目**继续使用 Codex 原生实现，Better UI Imropvement 不重复添加或替换。
-- **重新生成标题**会创建 system 来源的临时工作分支，在该分支上触发 Codex 原生压缩，再让 `gpt-5.6-luna` low 在同一压缩上下文中生成结构化标题；结束后永久删除工作分支，原会话不会被压缩或追加消息。
+- **标题生成默认模型**位于标题重新生成开关下方。插件每次启动或热重载都会读取 Codex 的可见模型列表，并在本地保存选择。支持时优先使用 `low` 推理强度，否则使用模型声明的默认强度。选择仅影响压缩后的标题生成。读取失败时可以重试；已保存模型不可用时会保留偏好并提示重新选择。
+- **重新生成标题**会创建 system 来源的临时工作分支，在该分支上触发 Codex 原生压缩，再让所选模型（初始默认 `gpt-5.4-mini`） 在同一压缩上下文中生成结构化标题；结束后永久删除工作分支，原会话不会被压缩或追加消息。
 - **导出 Markdown**位于原生分享和复制操作附近，按时间顺序导出用户与助手文本，并保留本地图片路径标记；系统/开发者上下文、推理和工具载荷不会写入文件。
 - **永久删除**位于菜单最底部并使用危险操作样式，必须明确确认；它调用 Codex 原生 `thread/delete`，不提供插件或 Codex++ 备份与撤销。
 - 三项功能各有独立开关。任一功能启用时，会隐藏 Codex++ 旧的行内“更多/删除”按钮，但不会影响 Codex 原生的置顶和归档按钮。
