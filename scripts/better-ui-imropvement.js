@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.16";
+  const VERSION = "1.4.17";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -5343,6 +5343,7 @@ const FEATURES = {
     const schedule = () => {
       if (!timer) timer = window.setTimeout(scan, 80);
     };
+    document.querySelectorAll(`#${STYLE_ID}`).forEach((node) => node.remove());
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `[${HIDDEN_ATTR}="true"] { display: none !important; visibility: hidden !important; pointer-events: none !important; }`;
@@ -7434,6 +7435,7 @@ const FEATURES = {
     const COLOR_STORAGE_KEY = PROJECT_COLOR_STORAGE_KEY;
     const NATIVE_COLOR_MENU_ID = "better-ui-imropvement-ui:project-color";
     const ASIDE_SELECTOR = [
+      "aside[data-app-shell-left-panel-appearance]",
       "aside.pointer-events-auto.relative.flex.overflow-hidden",
       "aside.pointer-events-auto.relative.flex.overflow-visible",
       "aside.pointer-events-auto.relative.flex",
@@ -7871,9 +7873,10 @@ const FEATURES = {
     };
 
     const markProjectParts = (row, label) => {
+      const nativeHeader = nativeProjectRowFor(row);
       const header = Array.from(row.querySelectorAll("[role='button'][aria-label]"))
         .find((node) => node instanceof HTMLElement && labelFor(node) === label);
-      const target = header instanceof HTMLElement ? header : row.querySelector("[role='button'][aria-label]");
+      const target = nativeHeader || (header instanceof HTMLElement ? header : row.querySelector("[role='button'][aria-label]"));
       if (!(target instanceof HTMLElement)) return;
 
       target.querySelectorAll("svg").forEach((node) => {
@@ -8240,6 +8243,7 @@ const FEATURES = {
     const PALETTE_CACHE_KEY = "__codexppSidebarProjectPalette";
     const COLOR_PREFS_CACHE_KEY = "__codexppSidebarProjectColorPrefs";
     const ASIDE_SELECTOR = [
+      "aside[data-app-shell-left-panel-appearance]",
       "aside.pointer-events-auto.relative.flex.overflow-hidden",
       "aside.pointer-events-auto.relative.flex.overflow-visible",
       "aside.pointer-events-auto.relative.flex",
