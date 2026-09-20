@@ -34,6 +34,11 @@ jobs:
           if ($manifest.version -ne $package.version -or $manifest.version -ne $sourceVersion) {
             throw "Manifest, package, and source versions must match."
           }
+          $notes = "./docs/RELEASE-$($manifest.version).md"
+          if (-not (Test-Path -LiteralPath $notes) -or [string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $notes -Raw))) {
+            throw "Missing or empty version-specific release notes: $notes"
+          }
+          Copy-Item -LiteralPath $notes -Destination "./dist/release-notes.md"
           if ($env:GITHUB_REF_TYPE -eq "tag") {
             if ($env:GITHUB_REF_NAME -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
               throw "Release tags must use vMAJOR.MINOR.PATCH."
@@ -69,6 +74,7 @@ jobs:
           path: |
             dist/better-ui-imropvement-*.zip
             dist/better-ui-imropvement-*.zip.sha256
+            dist/release-notes.md
           if-no-files-found: error
 
   release:
@@ -89,7 +95,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
+            gh release upload "$TAG" dist/*.zip dist/*.sha256 --clobber
+            gh release edit "$TAG" --notes-file dist/release-notes.md
           else
-            gh release create "$TAG" dist/* --verify-tag --generate-notes --title "$TAG"
+            gh release create "$TAG" dist/*.zip dist/*.sha256 --verify-tag --notes-file dist/release-notes.md --title "Better UI Imropvement $TAG"
           fi

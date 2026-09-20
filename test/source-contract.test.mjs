@@ -13,7 +13,7 @@ const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workfl
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.4.17");
+  assert.equal(manifest.version, "1.4.18");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -35,8 +35,12 @@ test("repository owns a self-contained Loader package contract", () => {
   );
 });
 
-test("tag releases bind GitHub CLI to the repository without a checkout", () => {
+test("tag releases bind GitHub CLI to the repository and publish reviewed notes", () => {
   assert.match(releaseWorkflow, /GH_REPO:\s*\$\{\{ github\.repository \}\}/u);
+  assert.match(releaseWorkflow, /Missing or empty version-specific release notes/u);
+  assert.match(releaseWorkflow, /gh release create[^\n]*--notes-file dist\/release-notes\.md/u);
+  assert.match(releaseWorkflow, /gh release edit[^\n]*--notes-file dist\/release-notes\.md/u);
+  assert.doesNotMatch(releaseWorkflow, /--generate-notes/u);
 });
 
 test("current renderer compatibility behavior remains covered in this repository", () => {

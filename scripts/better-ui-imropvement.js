@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.17";
+  const VERSION = "1.4.18";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -2095,6 +2095,7 @@ const FEATURES = {
     let scanRequested = false;
     let katexPromise = null;
     let mainModuleUrl = null;
+    let codeMirrorPromise = null;
     let lastError = null;
     let imageRequestSequence = 0;
 
@@ -2105,6 +2106,9 @@ const FEATURES = {
         box-sizing: border-box;
         color: var(--color-token-text-primary, currentColor);
         vertical-align: baseline;
+      }
+      .better-ui-imropvement-preview-delimiter {
+        display: none;
       }
       [${FORMULA_ATTR}="inline"] {
         display: inline-block;
@@ -2699,7 +2703,7 @@ const FEATURES = {
       return entry.promise;
     }
 
-    function currentMainModuleUrl() {
+    async function currentMainModuleUrl() {
       if (mainModuleUrl) return mainModuleUrl;
       const scripts = Array.from(document.scripts);
       const script = scripts.find((item) => /\/app-initial-[^/]+\.js(?:$|[?#])/.test(item.src));
@@ -2718,6 +2722,20 @@ const FEATURES = {
         .map((entry) => entry.name)
         .find((url) => /\/app-initial-[^/]+\.js(?:$|[?#])/.test(url));
       mainModuleUrl = resource || null;
+      // Current builds boot through index-*.js; timing entries may be cleared.
+      if (!mainModuleUrl) {
+        for (const entry of scripts) {
+          if (!/\/index-[^/]+\.js(?:$|[?#])/.test(entry.src)) continue;
+          const response = await fetch(entry.src);
+          if (!response.ok) continue;
+          const source = await response.text();
+          const match = source.match(/\.\/(app-initial-[A-Za-z0-9_-]+\.js)/);
+          if (match) {
+            mainModuleUrl = new URL(match[1], entry.src).href;
+            break;
+          }
+        }
+      }
       return mainModuleUrl;
     }
 
@@ -2728,7 +2746,7 @@ const FEATURES = {
         .find((url) => /\/katex-[^/]+\.js(?:$|[?#])/.test(url));
       if (loaded) return loaded;
 
-      const mainUrl = currentMainModuleUrl();
+      const mainUrl = await currentMainModuleUrl();
       if (!mainUrl) throw new Error("Codex main renderer module was not found");
       const response = await fetch(mainUrl);
       if (!response.ok) throw new Error(`Could not inspect Codex renderer (${response.status})`);
@@ -2751,6 +2769,7 @@ const FEATURES = {
           if (typeof katex?.renderToString !== "function") {
             throw new Error("Codex KaTeX module has no renderToString export");
           }
+          lastError = null;
           return katex;
         })
         .catch((error) => {
@@ -2779,8 +2798,13 @@ const FEATURES = {
       for (const surface of document.querySelectorAll("[data-editor-search-surface]")) {
         const editor = surface.querySelector(":scope > .cm-editor, .cm-editor");
         if (!(editor instanceof HTMLElement)) continue;
-        const fileName = markdownFileNameFor(surface);
-        if (!MARKDOWN_EXTENSION.test(fileName)) continue;
+        const controller = findEditorController(editor);
+        // Current file panes may hide the breadcrumb. Use their actual mode.
+        if (typeof controller?.fileKind === "string") {
+          if (controller.fileKind !== "markdown") continue;
+        } else if (!MARKDOWN_EXTENSION.test(controller?.filePath || markdownFileNameFor(surface))) {
+          continue;
+        }
         editors.push(editor);
       }
       return editors;
@@ -2918,16 +2942,48 @@ const FEATURES = {
       return null;
     }
 
-    function discoverCodeMirrorRuntime(controller) {
+    async function loadNativeCodeMirror(view) {
+      if (!codeMirrorPromise) {
+        codeMirrorPromise = (async () => {
+          const mainUrl = await currentMainModuleUrl();
+          if (!mainUrl) return null;
+          const source = await fetch(mainUrl).then((response) => response.text());
+          const editors = new Set(source.match(/text-file-editor-tab-content[^"'`/\s]+\.js/g) || []);
+          for (const editor of editors) {
+            const editorUrl = new URL(editor, mainUrl).href;
+            const editorSource = await fetch(editorUrl).then((response) => response.text());
+            const dependencies = new Set(editorSource.match(/\.\/dist-[A-Za-z0-9_-]+\.js/g) || []);
+            for (const dependency of dependencies) {
+              const module = await import(new URL(dependency, editorUrl).href);
+              const exports = Object.values(module);
+              // Match the active view's module, avoiding a second CodeMirror copy.
+              if (!exports.includes(view.constructor)) continue;
+              return exports.find((value) => typeof value?.mark === "function"
+                && typeof value?.replace === "function" && typeof value?.set === "function") || null;
+            }
+          }
+          return null;
+        })().catch((error) => {
+          codeMirrorPromise = null;
+          throw error;
+        });
+      }
+      return codeMirrorPromise;
+    }
+
+    async function discoverCodeMirrorRuntime(controller) {
       const view = controller?.editorView;
       if (!view?.state?.doc || !view.dom) return null;
-      const Decoration = discoverDecorationClass(view);
+      // Plain prose and formulas may have no existing decorations to inspect.
+      const Decoration = discoverDecorationClass(view) || await loadNativeCodeMirror(view);
       const StateField = discoverStateFieldClass(view);
-      const DecorationsFacet = discoverDecorationsFacet(view);
+      const DecorationsFacet = view.constructor.decorations || discoverDecorationsFacet(view);
+      const PrecExtension = extensionValues(view.state.config?.base)
+        .find((value) => Number.isInteger(value.prec) && value.inner != null)?.constructor;
       const existingCompartment = controller.readOnlyCompartment
         || controller.selectionEditCompartment
         || Array.from(view.state.config?.compartments?.keys?.() || [])[0];
-      if (!Decoration || !StateField || !DecorationsFacet || !existingCompartment) return null;
+      if (!Decoration || !StateField || !DecorationsFacet || !PrecExtension || !existingCompartment) return null;
 
       const Compartment = existingCompartment.constructor;
       const StateEffect = existingCompartment.reconfigure([]).constructor;
@@ -2944,6 +3000,7 @@ const FEATURES = {
         DecorationsFacet,
         Compartment,
         StateEffect,
+        PrecExtension,
       };
     }
 
@@ -3385,6 +3442,22 @@ const FEATURES = {
       const FormulaWidget = createFormulaWidgetClass(katex);
       const ImageWidget = createImageWidgetClass(context);
 
+      function replacePreview(range, widget, ranges) {
+        if (range.block) {
+          ranges.push(Decoration.replace({ widget, block: true }).range(range.from, range.to));
+          return;
+        }
+        // Leave the boundary characters in the document's mark hierarchy.
+        // Replacing an entire native TableCell range also removes its wrapper,
+        // even at highest precedence. Hidden boundary marks retain that cell.
+        const hidden = Decoration.mark({ class: "better-ui-imropvement-preview-delimiter" });
+        ranges.push(
+          hidden.range(range.from, range.from + 1),
+          Decoration.replace({ widget }).range(range.from + 1, range.to - 1),
+          hidden.range(range.to - 1, range.to),
+        );
+      }
+
       function buildDecorations(state) {
         const source = state.doc.toString();
         const ranges = [];
@@ -3393,16 +3466,7 @@ const FEATURES = {
         for (const image of images) {
           const range = imageRange(image, state);
           const widget = new ImageWidget(image, range);
-          let decoration;
-          try {
-            decoration = Decoration.replace({
-              widget,
-              block: range.block,
-            }).range(range.from, range.to);
-          } catch {
-            decoration = Decoration.replace({ widget }).range(image.start, image.end);
-          }
-          ranges.push(decoration);
+          replacePreview(range, widget, ranges);
         }
         for (const formula of formulas) {
           if (
@@ -3422,16 +3486,7 @@ const FEATURES = {
             formula.start,
             formula.end,
           );
-          let decoration;
-          try {
-            decoration = Decoration.replace({
-              widget,
-              block: range.block,
-            }).range(range.from, range.to);
-          } catch {
-            decoration = Decoration.replace({ widget }).range(formula.start, formula.end);
-          }
-          ranges.push(decoration);
+          replacePreview(range, widget, ranges);
         }
         return Decoration.set(ranges, true);
       }
@@ -3468,8 +3523,9 @@ const FEATURES = {
     async function installForEditor(editor, katex) {
       if (states.has(editor) || !editor.isConnected || disposed) return;
       const controller = findEditorController(editor);
-      const runtime = discoverCodeMirrorRuntime(controller);
+      const runtime = await discoverCodeMirrorRuntime(controller);
       if (!runtime) return;
+      if (disposed || !editor.isConnected || runtime.view.destroyed) return;
 
       const compartment = new runtime.Compartment();
       const extension = createMathExtension(runtime, katex, {
@@ -3481,7 +3537,9 @@ const FEATURES = {
           : "local",
       });
       runtime.view.dispatch({
-        effects: runtime.StateEffect.appendConfig.of(compartment.of(extension)),
+        // Higher precedence nests replacements inside native table-cell marks.
+        // Default precedence replaces the cell wrapper too, breaking its columns.
+        effects: runtime.StateEffect.appendConfig.of(compartment.of(new runtime.PrecExtension(extension, 0))),
       });
       states.set(editor, {
         editor,
@@ -3512,6 +3570,7 @@ const FEATURES = {
           }
         }
 
+        if (!editors.length) return;
         let katex;
         try {
           katex = await loadNativeKatex();
@@ -3519,7 +3578,14 @@ const FEATURES = {
           api.log.warn("Markdown preview math unavailable", error);
           return;
         }
-        for (const editor of editors) await installForEditor(editor, katex);
+        for (const editor of editors) {
+          try {
+            await installForEditor(editor, katex);
+          } catch (error) {
+            lastError = String(error?.message || error);
+            api.log.warn("Could not install Markdown preview extension", error);
+          }
+        }
       } finally {
         scanning = false;
         if (scanRequested && !disposed) scheduleScan();
