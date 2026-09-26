@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.19";
+  const VERSION = "1.4.20";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -2740,7 +2740,8 @@ const FEATURES = {
     }
 
     async function discoverKatexUrl() {
-      const preload = Array.from(document.querySelectorAll('link[rel="modulepreload"][href]'))
+      const preloads = Array.from(document.querySelectorAll('link[rel="modulepreload"][href]'));
+      const preload = preloads
         .find((item) => /\/katex-[^/]+\.js(?:$|[?#])/.test(item.href));
       if (preload) return preload.href;
       const loaded = performance
@@ -2749,14 +2750,19 @@ const FEATURES = {
         .find((url) => /\/katex-[^/]+\.js(?:$|[?#])/.test(url));
       if (loaded) return loaded;
 
+      // Inline-only documents do not trigger the native block-math lazy import.
+      const modules = preloads.map((item) => item.href)
+        .filter((url) => /\/text-file-editor-tab-content\.electron-[^/]+\.js(?:$|[?#])/.test(url));
       const mainUrl = await currentMainModuleUrl();
-      if (!mainUrl) throw new Error("Codex main renderer module was not found");
-      const response = await fetch(mainUrl);
-      if (!response.ok) throw new Error(`Could not inspect Codex renderer (${response.status})`);
-      const source = await response.text();
-      const match = source.match(/import\((?:`|"|')\.\/(katex-[^"'`]+\.js)(?:`|"|')\)/);
-      if (!match) throw new Error("Codex native KaTeX chunk was not found");
-      return new URL(match[1], mainUrl).href;
+      if (mainUrl) modules.push(mainUrl);
+      for (const moduleUrl of new Set(modules)) {
+        const response = await fetch(moduleUrl);
+        if (!response.ok) throw new Error(`Could not inspect Codex renderer (${response.status})`);
+        const source = await response.text();
+        const match = source.match(/import\((?:`|"|')\.\/(katex-[^"'`]+\.js)(?:`|"|')\)/);
+        if (match) return new URL(match[1], moduleUrl).href;
+      }
+      throw new Error("Codex native KaTeX chunk was not found");
     }
 
     function loadNativeKatex() {

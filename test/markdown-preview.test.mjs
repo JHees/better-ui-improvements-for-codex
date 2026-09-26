@@ -43,6 +43,20 @@ test("native KaTeX discovery uses modulepreload after the renderer bundle splits
   assert.equal(await context.discoverKatexUrl(),'app://-/assets/katex-current.js');
 });
 
+test("inline-only previews discover lazy KaTeX from the native editor before any block formula is opened", async () => {
+  const editor = 'app://-/assets/text-file-editor-tab-content.electron-current.js';
+  const reads = [];
+  const context = vm.createContext({ URL,
+    document: {querySelectorAll: () => [{href: editor}]},
+    performance: {getEntriesByType: () => []},
+    currentMainModuleUrl: async () => 'app://-/assets/app-initial-current.js',
+    fetch: async url => { reads.push(url); return {ok:true,text:async()=>url===editor?'const loadMath=()=>import(`./katex-lazy.js`);':'export {};'}; },
+  });
+  vm.runInContext(source.slice(source.indexOf("    async function discoverKatexUrl("),source.indexOf("    function loadNativeKatex(")),context);
+  assert.equal(await context.discoverKatexUrl(),'app://-/assets/katex-lazy.js');
+  assert.deepEqual(reads,[editor]);
+});
+
 const parserContext = vm.createContext({});
 vm.runInContext(source.slice(source.indexOf("    function escapedAt("), source.indexOf("    function dispatchDesktopViewMessage(")), parserContext);
 test("scientific inline and aligned display formulas retain their exact LaTeX", () => {
