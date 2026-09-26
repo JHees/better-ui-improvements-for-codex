@@ -36,6 +36,13 @@ test("native KaTeX discovery survives a cleared resource buffer and an index boo
   assert.equal(await context.discoverKatexUrl(), "app://-/assets/katex-current.js");
 });
 
+test("native KaTeX discovery uses modulepreload after the renderer bundle splits", async () => {
+  const context = vm.createContext({ document:{querySelectorAll:()=>[{href:'app://-/assets/katex-current.js'}]},
+    performance:{getEntriesByType:()=>[]}, currentMainModuleUrl:()=>{throw Error('preloaded module should be used');} });
+  vm.runInContext(source.slice(source.indexOf("    async function discoverKatexUrl("),source.indexOf("    function loadNativeKatex(")),context);
+  assert.equal(await context.discoverKatexUrl(),'app://-/assets/katex-current.js');
+});
+
 const parserContext = vm.createContext({});
 vm.runInContext(source.slice(source.indexOf("    function escapedAt("), source.indexOf("    function dispatchDesktopViewMessage(")), parserContext);
 test("scientific inline and aligned display formulas retain their exact LaTeX", () => {

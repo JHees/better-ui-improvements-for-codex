@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.4.18-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.19-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.18 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.4.19 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.4.18 修复 Markdown 文件预览中的 LaTeX 公式不显示和含公式表格错位的问题，兼容隐藏文件标题、只有正文与公式的文档，继续复用 Codex 自带的 KaTeX。详见[版本更新说明](docs/RELEASE-1.4.18.md)。
+1.4.19 适配 Codex 新版侧栏与拆分后的 renderer 模块。额度以紧凑控件放入左侧导航栏，悬停显示重置时间，不再占用会话列表底部空间；同时恢复会话操作、项目着色菜单和 Markdown 公式预览。详见[版本更新说明](docs/RELEASE-1.4.19.md)。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.18`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.19`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 

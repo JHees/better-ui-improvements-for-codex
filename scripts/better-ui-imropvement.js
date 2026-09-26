@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.18";
+  const VERSION = "1.4.19";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -805,7 +805,7 @@ function createSessionThreadActionsManager() {
       if (!fiber || visited.has(fiber)) continue;
       visited.add(fiber);
       let hook = fiber.memoizedState;
-      for (let index = 0; hook && index < 160; index += 1, hook = hook.next) {
+      for (let index = 0; hook && index < 256; index += 1, hook = hook.next) {
         const ref = hook.memoizedState;
         const candidate = ref?.current;
         if (typeof candidate !== "function") continue;
@@ -987,10 +987,10 @@ function createSessionThreadActionsManager() {
   async function discoverAppInitialUrls() {
     const urls = new Set();
     const collect = (value, base = document.baseURI) => {
-      const match = String(value || "").match(
-        /(?:\.\/|\/)?(?:assets\/)?app-initial-[A-Za-z0-9_-]+\.js/,
+      const matches = String(value || "").matchAll(
+        /(?:\.\/|\/)?(?:assets\/)?app-(?:initial|shared)-[A-Za-z0-9_-]+\.js/g,
       );
-      if (match) {
+      for (const match of matches) {
         let resolved = match[0];
         try {
           resolved = new URL(match[0], base).href;
@@ -2740,6 +2740,9 @@ const FEATURES = {
     }
 
     async function discoverKatexUrl() {
+      const preload = Array.from(document.querySelectorAll('link[rel="modulepreload"][href]'))
+        .find((item) => /\/katex-[^/]+\.js(?:$|[?#])/.test(item.href));
+      if (preload) return preload.href;
       const loaded = performance
         .getEntriesByType("resource")
         .map((entry) => entry.name)
@@ -3991,7 +3994,7 @@ const FEATURES = {
         } catch {
           return;
         }
-        if (/\/assets\/app-initial-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
+        if (/\/assets\/app-(?:initial|shared)-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
       };
       document.querySelectorAll("script[src], link[href]").forEach((node) => {
         add(node.src || node.href);
@@ -4955,6 +4958,20 @@ const FEATURES = {
     };
 
     const findSidebarSlot = () => {
+      const navigation = document.querySelector('aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
+      if (navigation && isVisibleElement(navigation)) {
+        let slot = navigation.querySelector(':scope > [data-codexpp="usage-slot"]');
+        if (!slot) {
+          slot = document.createElement("div");
+          slot.dataset.codexpp = "usage-slot";
+          slot.dataset.codexppUsageSlot = "navigation-rail";
+          slot.className = "flex shrink-0 items-center justify-center";
+          const profile = navigation.querySelector('button[aria-label="打开个人资料菜单"], button[aria-label="Open profile menu"]');
+          const utilities = Array.from(navigation.children).find((child) => profile && child.contains(profile));
+          navigation.insertBefore(slot, utilities || null);
+        }
+        return slot;
+      }
       const sidebar = findUsageSidebar();
       if (!sidebar) return null;
       for (const slot of sidebar.querySelectorAll('[data-codexpp="usage-slot"]')) {
@@ -5097,14 +5114,15 @@ const FEATURES = {
         return;
       }
       if (mounted) mounted.remove();
-      mounted = renderUsageBox(api, visibleSnapshot);
+      const compact = slot.dataset.codexppUsageSlot === "navigation-rail";
+      mounted = renderUsageBox(api, visibleSnapshot, compact);
       mounted.dataset.codexpp = "usage-box";
       slot.appendChild(mounted);
       lastMountedMode = slot.dataset.codexppUsageSlot || "unknown";
       mounted.style.flex = "0 1 auto";
-      mounted.style.width = "auto";
-      mounted.style.minWidth = "4.75rem";
-      mounted.style.maxWidth = "8.5rem";
+      mounted.style.width = compact ? "36px" : "auto";
+      mounted.style.minWidth = compact ? "0" : "4.75rem";
+      mounted.style.maxWidth = compact ? "36px" : "8.5rem";
       if (slot.dataset.codexppUsageSlot === "settings-inline-windows" || slot.dataset.codexppUsageSlot === "controls-inline") {
         mounted.style.width = "auto";
         mounted.style.minWidth = "4.75rem";
@@ -7985,7 +8003,7 @@ const FEATURES = {
         "button[aria-haspopup='menu'], [role='button'][aria-haspopup='menu']",
       );
       let fiber = reactFiberFor(button);
-      for (let depth = 0; fiber && depth < 16; depth += 1, fiber = fiber.return) {
+      for (let depth = 0; fiber && depth < 32; depth += 1, fiber = fiber.return) {
         const handle = fiber.memoizedProps?.ref?.current;
         if (handle && typeof handle.getContextMenuItems === "function") return handle;
       }
@@ -8675,7 +8693,8 @@ function formatCreditAmount(value) {
  * The returned element exposes `_refresh(snapshot)` so callers can update
  * values in place without unmount/remount.
  */
-function renderUsageBox(api, snapshot) {
+function renderUsageBox(api, snapshot, compact = false) {
+  const zh = /^zh/i.test(document.documentElement.lang || "");
   const BASE_ORDER = ["5h", "weekly"];
   let order = [...BASE_ORDER];
   let kind = api.storage.get("usage:visible-kind", "5h");
@@ -8705,6 +8724,13 @@ function renderUsageBox(api, snapshot) {
   left.className = "min-w-0 truncate";
   const right = document.createElement("span");
   right.className = "shrink-0 tabular-nums flex items-center gap-1";
+
+  if (compact) {
+    btn.className = "cursor-interaction rounded-lg hover:bg-primary-ghost-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+    btn.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;height:40px;padding:3px 0;border:0;line-height:1.2";
+    left.style.cssText = "font-size:9px;color:var(--color-text-tertiary,inherit)";
+    right.style.cssText = "font-size:12px;font-weight:600;letter-spacing:-.3px";
+  }
 
   btn.append(left, right);
 
@@ -8741,6 +8767,8 @@ function renderUsageBox(api, snapshot) {
       setText(left, "API");
       setClass(left, "truncate");
       right.replaceChildren();
+      btn.title = "API";
+      btn.setAttribute("aria-label", "API");
       return;
     }
     const entry = entryFor(snap, kind);
@@ -8752,10 +8780,12 @@ function renderUsageBox(api, snapshot) {
     btn.classList.toggle("text-token-charts-red", lowEnergy);
     btn.classList.toggle("bg-token-foreground/5", !lowEnergy);
     btn.classList.toggle("text-token-text-primary", !lowEnergy);
+    if (compact) btn.classList.toggle("text-danger", lowEnergy);
 
     setText(
       left,
-      entry?.label || (kind === "5h" ? "5h" : kind === "weekly" ? "Weekly" : "Credit"),
+      compact ? (kind === "5h" ? "5h" : kind === "weekly" ? (zh ? "每周" : "Week") : (zh ? "点数" : "Credit"))
+        : entry?.label || (kind === "5h" ? "5h" : kind === "weekly" ? "Weekly" : "Credit"),
     );
 
     const pctEl = singleRightSpan();
@@ -8768,6 +8798,11 @@ function renderUsageBox(api, snapshot) {
           : `${remaining}%`,
     );
     setClass(pctEl, lowEnergy ? "font-medium" : "text-token-text-secondary");
+    if (compact) {
+      const label = kind === "5h" ? (zh ? "5 小时额度" : "5-hour usage") : kind === "weekly" ? (zh ? "每周额度" : "Weekly usage") : "Credit";
+      btn.title = `${label}: ${pctEl.textContent}${kind !== "points" ? ` · ${zh ? "重置" : "Resets"}: ${entry?.resetAt || "—"}` : ""}\n${zh ? "点击切换额度类型" : "Click to switch usage type"}`;
+      btn.setAttribute("aria-label", btn.title);
+    }
   };
 
   /** Replace the entire box content with the reset label. */
@@ -8782,11 +8817,14 @@ function renderUsageBox(api, snapshot) {
       applyValueState(snap);
       return;
     }
-    setText(left, "Resets:");
+    const reset = entry?.resetAt || "—";
+    const parts = compact ? reset.match(/^(.*?)(\d{1,2}:\d{2})(.*)$/u) : null;
+    const day = parts ? `${parts[1].replace(/[,，]/g, "").trim()} ${parts[3].trim()}`.trim() : "";
+    setText(left, compact ? day || (zh ? "重置" : "Reset") : "Resets:");
     setClass(left, "truncate text-token-text-secondary");
     const t = singleRightSpan();
     setClass(t, "tabular-nums");
-    setText(t, entry?.resetAt || "—");
+    setText(t, parts ? parts[2] : reset);
   };
 
   // Bind hover with a snapshot getter so handlers always see the latest.
