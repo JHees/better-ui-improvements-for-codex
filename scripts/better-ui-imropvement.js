@@ -7616,48 +7616,27 @@ const FEATURES = {
     style.id = STYLE_ID;
     style.textContent = `
       :root {
-        --codexpp-project-blue-text: var(--blue-400, #0285ff);
-        --codexpp-project-green-text: color-mix(in srgb, var(--green-400, #04b84c) 72%, black);
-        --codexpp-project-yellow-text: color-mix(in srgb, var(--yellow-400, #ffc300) 42%, black);
-        --codexpp-project-red-text: color-mix(in srgb, var(--red-400, #fa423e) 82%, black);
-        --codexpp-project-pink-text: color-mix(in srgb, var(--pink-400, #ff66ad) 68%, black);
-        --codexpp-project-purple-text: color-mix(in srgb, var(--purple-400, #924ff7) 82%, black);
-        --codexpp-project-gray-text: color-mix(in srgb, var(--color-token-text-primary, currentColor) 25%, black);
-      }
-
-      .electron-dark {
-        --codexpp-project-blue-text: var(--blue-400, #0285ff);
-        --codexpp-project-green-text: var(--green-400, #04b84c);
-        --codexpp-project-yellow-text: var(--yellow-400, #ffc300);
-        --codexpp-project-red-text: color-mix(in srgb, var(--red-400, #fa423e) 86%, white);
-        --codexpp-project-pink-text: var(--pink-400, #ff66ad);
-        --codexpp-project-purple-text: color-mix(in srgb, var(--purple-400, #924ff7) 88%, white);
-        --codexpp-project-gray-text: var(--color-token-text-secondary);
+        /* Follow Codex's effective theme, including an app override of the OS theme. */
+        --codexpp-project-blue-text: light-dark(#0069cc, #85bfff);
+        --codexpp-project-green-text: light-dark(#087c3c, #83cda0);
+        --codexpp-project-yellow-text: light-dark(#806200, #d9c681);
+        --codexpp-project-red-text: light-dark(#bf3633, #e99c99);
+        --codexpp-project-pink-text: light-dark(#b33170, #e6a2c3);
+        --codexpp-project-purple-text: light-dark(#7540c5, #bda4e8);
+        --codexpp-project-gray-text: var(--color-token-text-secondary, light-dark(#666, #aaa));
       }
 
       [${ATTR}="row"] {
         position: relative !important;
-        border-radius: var(--radius-md, 0.375rem) !important;
-        background-color: color-mix(
-          in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 7%,
-          transparent
+        border-radius: var(--radius-lg, 0.5rem) !important;
+        background-color: light-dark(
+          color-mix(in srgb, var(--codexpp-project-tint, #888) 5%, transparent),
+          color-mix(in srgb, var(--codexpp-project-text-color, #aaa) 6%, transparent)
         ) !important;
-        box-shadow:
-          inset 0 0 0 1px color-mix(
-            in srgb,
-            var(--codexpp-project-text-color, var(--codexpp-project-tint, var(--color-token-text-secondary))) 30%,
-            transparent
-          ) !important;
-      }
-
-      .electron-dark [${ATTR}="row"] {
-        box-shadow:
-          inset 0 0 0 1px color-mix(
-            in srgb,
-            var(--codexpp-project-text-color, var(--codexpp-project-tint, var(--color-token-text-secondary))) 22%,
-            transparent
-          ) !important;
+        box-shadow: inset 0 0 0 1px light-dark(
+          color-mix(in srgb, var(--codexpp-project-text-color, #666) 12%, transparent),
+          rgb(255 255 255 / 6%)
+        ) !important;
       }
 
       [${ATTR}="row"][style*="--codexpp-project-blue-token-override"] {
@@ -7683,10 +7662,9 @@ const FEATURES = {
       }
 
       [${ATTR}="row"]:hover {
-        background-color: color-mix(
-          in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 10%,
-          transparent
+        background-color: light-dark(
+          color-mix(in srgb, var(--codexpp-project-tint, #888) 9%, transparent),
+          color-mix(in srgb, var(--codexpp-project-text-color, #aaa) 10%, transparent)
         ) !important;
       }
 
