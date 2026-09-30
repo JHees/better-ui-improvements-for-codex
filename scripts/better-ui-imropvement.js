@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.20";
+  const VERSION = "1.4.21";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -43,6 +43,13 @@
       detail: "在侧栏显示 5 小时和每周额度；点击额度可切换周期，有 Credit 数据时一并显示。",
       defaultEnabled: true,
       status: "当前页面暴露额度信号时可用",
+    },
+    {
+      id: "app-theme-toggle",
+      title: "明暗主题切换按钮",
+      detail: "在侧栏独立显示明暗切换按钮，切换并保存 Codex App 的浅色 / 深色外观；悬停显示目标外观。",
+      defaultEnabled: true,
+      status: "可用",
     },
     {
       id: "hide-usage-alert",
@@ -1990,6 +1997,26 @@ function createSessionThreadActionsManager() {
   }
 
   return {
+    async setAppTheme(theme) {
+      if (!["light", "dark"].includes(theme)) throw new Error("Invalid app theme");
+      const row = nativeScopeElement();
+      const scope = row && scopeFromRow(row);
+      if (!scope) throw new Error("Codex settings are not ready");
+      for (const mod of await loadAppInitialModules()) {
+        const values = Object.values(mod);
+        const setting = values.find(value => value?.theme?.key === "appearanceTheme")?.theme;
+        if (!setting) continue;
+        const write = values.find(value => {
+          if (typeof value !== "function") return false;
+          try {
+            const source = Function.prototype.toString.call(value);
+            return source.includes(".query.snapshot(") && source.includes("configuredValues:") && source.includes("optimistic");
+          } catch { return false; }
+        });
+        if (write) return await write(scope, setting, theme, { optimistic: false });
+      }
+      throw new Error("Codex appearance settings are unavailable");
+    },
     async listTitleModels() {
       const row = nativeScopeElement();
       if (!row) throw new Error("Codex model client is not ready");
@@ -2052,6 +2079,480 @@ function createSessionThreadActionsManager() {
 }
 
 // ─────────────────────────────────────────────────────────────── features ──
+
+// Both sidebar features use the same final anchor, independently of enabled state.
+function createSidebarSlotFinder() {
+    const ASIDE_SELECTOR = [
+      "aside.pointer-events-auto.relative.flex.overflow-hidden",
+      "aside.pointer-events-auto.relative.flex.overflow-visible",
+      "aside.pointer-events-auto.relative.flex",
+    ].join(", ");
+    const SIDEBAR_CANDIDATE_SELECTOR = [
+      ASIDE_SELECTOR,
+      "aside",
+      "nav",
+      "[role='navigation']",
+      "[data-testid*='sidebar' i]",
+      "[data-test*='sidebar' i]",
+      "[class*='sidebar' i]",
+    ].join(", ");
+
+    const compactSidebarText = (node) =>
+      (node?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+    const looksLikeSettingsSidebar = (sidebar) => {
+      if (!(sidebar instanceof HTMLElement)) return false;
+      if (
+        sidebar.matches(".window-fx-sidebar-surface.w-token-sidebar") ||
+        sidebar.closest(".window-fx-sidebar-surface.w-token-sidebar")
+      ) {
+        return true;
+      }
+      const text = compactSidebarText(sidebar);
+      const englishSettings =
+        text.includes("general") &&
+        text.includes("appearance") &&
+        (text.includes("account") || text.includes("configuration"));
+      const chineseSettings =
+        text.includes("常规") &&
+        text.includes("外观") &&
+        (
+          text.includes("配置") ||
+          text.includes("个性化") ||
+          text.includes("键盘快捷键") ||
+          text.includes("mcp 服务器") ||
+          text.includes("钩子") ||
+          text.includes("连接") ||
+          text.includes("环境") ||
+          text.includes("工作树") ||
+          text.includes("已归档")
+        );
+      return englishSettings || chineseSettings;
+    };
+
+    const looksLikeMainAppSidebar = (sidebar) => {
+      const text = compactSidebarText(sidebar);
+      const hasNewChat = /\bnew chat\b|\bquick chat\b|新建|新对话/.test(text);
+      const hasSearch = /\bsearch\b|搜索/.test(text);
+      const hasProjectOrHistory =
+        /\bprojects?\b|\bhistory\b|\bchats?\b|项目|历史|会话/.test(text);
+      return (hasNewChat && hasSearch) || (hasSearch && hasProjectOrHistory);
+    };
+
+    const quickControlText = (node) =>
+      [
+        node.getAttribute?.("aria-label"),
+        node.getAttribute?.("title"),
+        node.textContent,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+    const isSidebarGeometry = (node) => {
+      if (!(node instanceof HTMLElement) || !isVisibleElement(node)) return false;
+      const rect = node.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      return (
+        rect.width >= 180 &&
+        rect.width <= Math.min(520, Math.max(320, viewportWidth * 0.55)) &&
+        rect.height >= Math.max(360, viewportHeight * 0.45) &&
+        rect.left <= Math.max(96, viewportWidth * 0.12) &&
+        rect.top <= Math.max(96, viewportHeight * 0.18)
+      );
+    };
+
+    const hasBottomControl = (sidebar) => {
+      const sidebarRect = sidebar.getBoundingClientRect();
+      const controls = Array.from(sidebar.querySelectorAll('button, a, [role="button"], [role="status"], [aria-live], span, div'));
+      return controls.some((control) => {
+        if (!(control instanceof HTMLElement) || !isVisibleElement(control)) return false;
+        const rect = control.getBoundingClientRect();
+        const text = quickControlText(control);
+        const nearBottom = rect.bottom >= sidebarRect.bottom - 260;
+        const compact = rect.width > 0 && rect.width <= 64 && rect.height > 0 && rect.height <= 64;
+        const downloadStatus = text.length <= 80 && /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
+        return nearBottom && (compact || downloadStatus || /\bmobile\b|\bphone\b|\bdevice\b|\bsettings?\b|手机|移动|设备|连接|设置/.test(text));
+      });
+    };
+
+    const addSidebarAncestorsForBottomControls = (candidates) => {
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const controls = Array.from(document.querySelectorAll('button, a, [role="button"], [role="status"], [aria-live], span, div'));
+      for (const control of controls) {
+        if (!(control instanceof HTMLElement) || !isVisibleElement(control)) continue;
+        const rect = control.getBoundingClientRect();
+        if (rect.left > 560 || rect.bottom < viewportHeight - 280) continue;
+        const text = quickControlText(control);
+        const compact = rect.width > 0 && rect.width <= 64 && rect.height > 0 && rect.height <= 64;
+        const downloadStatus = text.length <= 80 && /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
+        if (!compact && !downloadStatus && !/\bmobile\b|\bphone\b|\bdevice\b|\bsettings?\b|手机|移动|设备|连接|设置/.test(text)) continue;
+        let node = control.parentElement;
+        while (node && node !== document.body) {
+          if (isSidebarGeometry(node) && !looksLikeSettingsSidebar(node)) candidates.add(node);
+          node = node.parentElement;
+        }
+      }
+    };
+
+    const sidebarScore = (sidebar) => {
+      if (!isSidebarGeometry(sidebar) || looksLikeSettingsSidebar(sidebar)) return -Infinity;
+      const rect = sidebar.getBoundingClientRect();
+      let score = 0;
+      if (rect.left <= 16) score += 4;
+      else if (rect.left <= 80) score += 2;
+      if (rect.width >= 220 && rect.width <= 420) score += 3;
+      if (rect.height >= (window.innerHeight || 0) * 0.75) score += 3;
+      if (looksLikeMainAppSidebar(sidebar)) score += 6;
+      if (hasBottomControl(sidebar)) score += 5;
+      if (/^(aside|nav)$/i.test(sidebar.tagName) || sidebar.getAttribute("role") === "navigation") score += 2;
+      return score;
+    };
+
+    const findUsageSidebar = () => {
+      const primarySidebar = Array.from(document.querySelectorAll(ASIDE_SELECTOR))
+        .find((sidebar) => {
+          if (!(sidebar instanceof HTMLElement) || !isVisibleElement(sidebar)) return false;
+          if (looksLikeSettingsSidebar(sidebar)) return false;
+          const rect = sidebar.getBoundingClientRect();
+          return rect.width >= 150 && rect.height >= 300;
+        });
+      if (primarySidebar instanceof HTMLElement) return primarySidebar;
+      const candidates = new Set(
+        Array.from(document.querySelectorAll(SIDEBAR_CANDIDATE_SELECTOR))
+          .filter((node) => node instanceof HTMLElement),
+      );
+      addSidebarAncestorsForBottomControls(candidates);
+      return Array.from(candidates)
+        .map((sidebar) => ({ sidebar, score: sidebarScore(sidebar) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score || a.sidebar.getBoundingClientRect().left - b.sidebar.getBoundingClientRect().left)[0]?.sidebar || null;
+    };
+
+    const controlText = (node) =>
+      [
+        node.getAttribute?.("aria-label"),
+        node.getAttribute?.("title"),
+        node.textContent,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+    const controlLabelText = (node) =>
+      [node.getAttribute?.("aria-label"), node.getAttribute?.("title")]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+
+    const isDeviceButton = (button) => {
+      const label = controlLabelText(button);
+      if (/\bmobile\b|\bphone\b|\bdevice\b|手机|移动|设备|连接/.test(label)) return true;
+      const text = controlText(button);
+      return text.length <= 28 && /\bmobile\b|\bphone\b|\bdevice\b|手机|移动|设备|连接/.test(text);
+    };
+
+    const isDownloadStatusNode = (node) => {
+      const text = controlText(node);
+      if (!text || text.length > 80) return false;
+      return /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
+    };
+
+    const isSettingsButton = (button) => {
+      const text = controlText(button);
+      return /\bsettings?\b|preferences?|设置|偏好/.test(text);
+    };
+
+    const isProfileButton = (button) => {
+      const text = controlText(button);
+      return /\bprofile\b|\baccount\b|个人资料|账户|账号/.test(text);
+    };
+
+    const isBottomUtilityButton = (button) => {
+      const text = controlText(button);
+      return /\bvoice\b|\bhelp\b|语音|帮助/.test(text);
+    };
+
+    const isNearSidebarBottom = (sidebar, node) => {
+      if (!(sidebar instanceof HTMLElement) || !(node instanceof HTMLElement)) return false;
+      const sidebarRect = sidebar.getBoundingClientRect();
+      const rect = node.getBoundingClientRect();
+      const bottomBand = Math.min(Math.max(sidebarRect.height * 0.22, 120), 240);
+      const visibleBottom = Math.min(
+        sidebarRect.bottom,
+        window.innerHeight || document.documentElement.clientHeight || sidebarRect.bottom,
+      );
+      return (
+        rect.top < visibleBottom &&
+        rect.bottom <= visibleBottom + 8 &&
+        rect.bottom >= visibleBottom - bottomBand
+      );
+    };
+
+    const isUsageControlNode = (node) =>
+      node.closest?.('[data-codexpp="usage-slot"], [data-codexpp="usage-box"], [data-codexpp="usage-boxes"]');
+
+    const isSidebarContentRow = (node) => Boolean(
+      node?.closest?.(
+        '[data-app-action-sidebar-thread-row], ' +
+        '[data-app-action-sidebar-project-row], ' +
+        '[data-app-action-sidebar-project-list-id], ' +
+        '[role="listitem"]',
+      ),
+    );
+
+    const isBottomToolbarRow = (sidebar, row) => {
+      if (
+        !(sidebar instanceof HTMLElement) ||
+        !(row instanceof HTMLElement) ||
+        isSidebarContentRow(row)
+      ) {
+        return false;
+      }
+      const sidebarRect = sidebar.getBoundingClientRect();
+      const rect = row.getBoundingClientRect();
+      const style = window.getComputedStyle(row);
+      if (
+        style.display !== "flex" ||
+        rect.width < sidebarRect.width * 0.75 ||
+        rect.height < 36 ||
+        rect.height > (row.querySelector('[data-codexpp="app-theme-toggle"]') ? 128 : 80) ||
+        rect.bottom < sidebarRect.bottom - 20 ||
+        rect.bottom > sidebarRect.bottom + 8
+      ) {
+        return false;
+      }
+      const controls = Array.from(row.querySelectorAll('button, a, [role="button"]'))
+        .filter((control) => control instanceof HTMLElement && !isUsageControlNode(control));
+      return controls.some(isProfileButton) && controls.some(isBottomUtilityButton);
+    };
+
+    const nearestBottomToolbar = (sidebar, control) => {
+      let row = control;
+      while (row && row !== document.body && row !== sidebar.parentElement) {
+        if (isBottomToolbarRow(sidebar, row)) return row;
+        row = row.parentElement;
+      }
+      return null;
+    };
+
+    const nearestControlRow = (sidebar, button) => {
+      if (isSidebarContentRow(button)) return null;
+      const sidebarRect = sidebar.getBoundingClientRect();
+      let row = button.parentElement;
+      while (row && row !== document.body && row !== sidebar.parentElement) {
+        if (!(row instanceof HTMLElement)) break;
+        if (isSidebarContentRow(row)) return null;
+        const rect = row.getBoundingClientRect();
+        const style = window.getComputedStyle(row);
+        const buttonCount = row.querySelectorAll('button, a, [role="button"]').length;
+        const insideSidebar =
+          rect.left >= sidebarRect.left - 8 &&
+          rect.right <= sidebarRect.right + 8;
+        const nearBottom = isNearSidebarBottom(sidebar, row);
+        const looksLikeControlLayer =
+          insideSidebar &&
+          nearBottom &&
+          rect.height > 0 &&
+          rect.height <= 128 &&
+          (style.display === "flex" || style.display === "grid" || buttonCount >= 2);
+        if (looksLikeControlLayer) return row;
+        row = row.parentElement;
+      }
+      return null;
+    };
+
+    const nearestBottomStatusRow = (sidebar, node) => {
+      const sidebarRect = sidebar.getBoundingClientRect();
+      let row = node.parentElement;
+      while (row && row !== document.body && row !== sidebar.parentElement) {
+        if (!(row instanceof HTMLElement)) break;
+        const rect = row.getBoundingClientRect();
+        const style = window.getComputedStyle(row);
+        const insideSidebar =
+          rect.left >= sidebarRect.left - 8 &&
+          rect.right <= sidebarRect.right + 8;
+        const nearBottom = isNearSidebarBottom(sidebar, row);
+        const compactStatusLayer =
+          insideSidebar &&
+          nearBottom &&
+          rect.height > 0 &&
+          rect.height <= 96 &&
+          (style.display === "flex" || style.display === "grid" || isDownloadStatusNode(row));
+        if (compactStatusLayer) return row;
+        row = row.parentElement;
+      }
+      return null;
+    };
+
+    const createInlineSlot = (row, anchor, mode = "controls-inline") => {
+      const existing = row.querySelector(':scope > [data-codexpp="usage-slot"]');
+      if (existing instanceof HTMLElement) return existing;
+      const slot = document.createElement("div");
+      slot.dataset.codexpp = "usage-slot";
+      slot.dataset.codexppUsageSlot = mode;
+      slot.className = "flex shrink-0 items-center";
+      if (anchor?.parentElement === row) {
+        row.insertBefore(slot, anchor.nextSibling);
+      }
+      else row.appendChild(slot);
+      return slot;
+    };
+
+    const createBottomToolbarSlot = (toolbar) => {
+      const existing = toolbar.querySelector(':scope > [data-codexpp="usage-slot"]');
+      if (existing instanceof HTMLElement) return existing;
+      const slot = document.createElement("div");
+      slot.dataset.codexpp = "usage-slot";
+      slot.dataset.codexppUsageSlot = "bottom-toolbar-inline";
+      slot.className = "flex shrink-0 items-center";
+      toolbar.appendChild(slot);
+      return slot;
+    };
+
+    const isValidUsageSlot = (sidebar, slot) => {
+      if (
+        !(slot instanceof HTMLElement) ||
+        !(slot.parentElement instanceof HTMLElement) ||
+        !slot.isConnected ||
+        !sidebar.contains(slot)
+      ) {
+        return false;
+      }
+      const mode = slot.dataset.codexppUsageSlot;
+      const row = slot.parentElement;
+      if (isSidebarContentRow(row) || !isNearSidebarBottom(sidebar, row)) return false;
+      if (mode === "bottom-toolbar-inline") return isBottomToolbarRow(sidebar, row);
+      if (mode === "status-inline") return isDownloadStatusNode(row);
+      if (mode !== "controls-inline") return false;
+      return Array.from(row.querySelectorAll('button, a, [role="button"]')).some(
+        (control) =>
+          control instanceof HTMLElement &&
+          !isUsageControlNode(control) &&
+          !isSidebarContentRow(control) &&
+          (isDeviceButton(control) || isSettingsButton(control)),
+      );
+    };
+
+    const findSidebarSlot = () => {
+      const navigation = document.querySelector('aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
+      // A hidden or unfinished modern rail is not a legacy sidebar.
+      if (navigation || document.querySelector("aside.app-shell-left-panel")) {
+        if (!navigation || !isVisibleElement(navigation)) return null;
+        let slot = navigation.querySelector(':scope > [data-codexpp="usage-slot"]');
+        if (!slot) {
+          slot = document.createElement("div");
+          slot.dataset.codexpp = "usage-slot";
+          slot.dataset.codexppUsageSlot = "navigation-rail";
+          slot.className = "flex shrink-0 items-center justify-center";
+          const profile = navigation.querySelector('button[aria-label="打开个人资料菜单"], button[aria-label="Open profile menu"]');
+          const utilities = Array.from(navigation.children).find((child) => profile && child.contains(profile));
+          navigation.insertBefore(slot, utilities || null);
+        }
+        return slot;
+      }
+      const sidebar = findUsageSidebar();
+      if (!sidebar) return null;
+      for (const slot of sidebar.querySelectorAll('[data-codexpp="usage-slot"]')) {
+        if (!isValidUsageSlot(sidebar, slot)) slot.remove();
+      }
+      const existingSlots = Array.from(
+        sidebar.querySelectorAll('[data-codexpp="usage-slot"]'),
+      ).filter((slot) => isValidUsageSlot(sidebar, slot));
+      const existingInline = existingSlots.find((slot) =>
+        slot.dataset.codexppUsageSlot === "controls-inline" ||
+        slot.dataset.codexppUsageSlot === "status-inline" ||
+        slot.dataset.codexppUsageSlot === "bottom-toolbar-inline",
+      );
+      if (existingInline instanceof HTMLElement) return existingInline;
+
+      const controls = Array.from(sidebar.querySelectorAll('button, a, [role="button"]'))
+        .filter((button) =>
+          button instanceof HTMLElement &&
+          isVisibleElement(button) &&
+          isNearSidebarBottom(sidebar, button) &&
+          !isUsageControlNode(button) &&
+          !isSidebarContentRow(button),
+        );
+      const bottomToolbarControl = controls.find(
+        (control) => isProfileButton(control) || isBottomUtilityButton(control),
+      );
+      const bottomToolbar = bottomToolbarControl
+        ? nearestBottomToolbar(sidebar, bottomToolbarControl)
+        : null;
+      if (bottomToolbar) {
+        return createBottomToolbarSlot(bottomToolbar);
+      }
+      const deviceControls = controls.filter(isDeviceButton);
+      const settingsControls = controls.filter(isSettingsButton);
+      const preferredControls = deviceControls.length
+        ? deviceControls
+        : settingsControls;
+      const ordered = preferredControls.sort((a, b) => {
+        const ar = a.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        return br.right - ar.right || br.bottom - ar.bottom;
+      });
+
+      for (const button of ordered) {
+        const row = nearestControlRow(sidebar, button);
+        if (row) {
+          return createInlineSlot(row, button);
+        }
+      }
+
+      const statusAnchors = Array.from(
+        sidebar.querySelectorAll('[role="status"], [aria-live], [aria-label], [title], span, div'),
+      )
+        .filter((node) =>
+          node instanceof HTMLElement &&
+          isVisibleElement(node) &&
+          isNearSidebarBottom(sidebar, node) &&
+          !isUsageControlNode(node) &&
+          isDownloadStatusNode(node),
+        )
+        .sort((a, b) => {
+          const ar = a.getBoundingClientRect();
+          const br = b.getBoundingClientRect();
+          return br.bottom - ar.bottom || br.right - ar.right;
+        });
+
+      for (const anchor of statusAnchors) {
+        const row = nearestBottomStatusRow(sidebar, anchor);
+        if (row) {
+          return createInlineSlot(row, anchor, "status-inline");
+        }
+      }
+
+      return null;
+    };
+
+    return findSidebarSlot;
+}
+
+function isVisibleElement(node) {
+      if (!(node instanceof HTMLElement) || !node.isConnected) return false;
+      if (node.closest("[hidden], [inert], [aria-hidden='true']")) return false;
+      const style = window.getComputedStyle(node);
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.opacity === "0"
+      ) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }
+
+const findSidebarSlot = createSidebarSlotFinder();
 
 const FEATURES = {
   "thread-title-regeneration"(api) {
@@ -3841,37 +4342,6 @@ const FEATURES = {
     let accountModeCandidateAt = 0;
 
     const log = (...a) => api.log.info("[usage]", ...a);
-    const ASIDE_SELECTOR = [
-      "aside.pointer-events-auto.relative.flex.overflow-hidden",
-      "aside.pointer-events-auto.relative.flex.overflow-visible",
-      "aside.pointer-events-auto.relative.flex",
-    ].join(", ");
-    const SIDEBAR_CANDIDATE_SELECTOR = [
-      ASIDE_SELECTOR,
-      "aside",
-      "nav",
-      "[role='navigation']",
-      "[data-testid*='sidebar' i]",
-      "[data-test*='sidebar' i]",
-      "[class*='sidebar' i]",
-    ].join(", ");
-
-    // ── parsing ────────────────────────────────────────────────────────
-    const isVisibleElement = (node) => {
-      if (!(node instanceof HTMLElement) || !node.isConnected) return false;
-      if (node.closest("[hidden], [inert], [aria-hidden='true']")) return false;
-      const style = window.getComputedStyle(node);
-      if (
-        style.display === "none" ||
-        style.visibility === "hidden" ||
-        style.opacity === "0"
-      ) {
-        return false;
-      }
-      const rect = node.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    };
-
     const applySnapshot = (partial, source) => {
       if (disposed) return false;
       if (
@@ -4591,476 +5061,6 @@ const FEATURES = {
       }
     };
 
-    // ── sidebar mount ─────────────────────────────────────────────────
-    /**
-     * Find the sidebar slot for the upgrade pill. The pill itself is
-     * hidden by `hide-upgrade-prompts`, so we mount as a sibling that
-     * replaces its visual footprint. We anchor on the parent of any
-     * button/link with text "Upgrade" (case-insensitive), or fall back
-     * to the bottom of the sidebar group.
-     *
-     * Returns the parent element to mount into, or null if not found.
-     */
-    const compactSidebarText = (node) =>
-      (node?.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-
-    const looksLikeSettingsSidebar = (sidebar) => {
-      if (!(sidebar instanceof HTMLElement)) return false;
-      if (
-        sidebar.matches(".window-fx-sidebar-surface.w-token-sidebar") ||
-        sidebar.closest(".window-fx-sidebar-surface.w-token-sidebar")
-      ) {
-        return true;
-      }
-      const text = compactSidebarText(sidebar);
-      const englishSettings =
-        text.includes("general") &&
-        text.includes("appearance") &&
-        (text.includes("account") || text.includes("configuration"));
-      const chineseSettings =
-        text.includes("常规") &&
-        text.includes("外观") &&
-        (
-          text.includes("配置") ||
-          text.includes("个性化") ||
-          text.includes("键盘快捷键") ||
-          text.includes("mcp 服务器") ||
-          text.includes("钩子") ||
-          text.includes("连接") ||
-          text.includes("环境") ||
-          text.includes("工作树") ||
-          text.includes("已归档")
-        );
-      return englishSettings || chineseSettings;
-    };
-
-    const looksLikeMainAppSidebar = (sidebar) => {
-      const text = compactSidebarText(sidebar);
-      const hasNewChat = /\bnew chat\b|\bquick chat\b|新建|新对话/.test(text);
-      const hasSearch = /\bsearch\b|搜索/.test(text);
-      const hasProjectOrHistory =
-        /\bprojects?\b|\bhistory\b|\bchats?\b|项目|历史|会话/.test(text);
-      return (hasNewChat && hasSearch) || (hasSearch && hasProjectOrHistory);
-    };
-
-    const quickControlText = (node) =>
-      [
-        node.getAttribute?.("aria-label"),
-        node.getAttribute?.("title"),
-        node.textContent,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-
-    const isSidebarGeometry = (node) => {
-      if (!(node instanceof HTMLElement) || !isVisibleElement(node)) return false;
-      const rect = node.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
-      return (
-        rect.width >= 180 &&
-        rect.width <= Math.min(520, Math.max(320, viewportWidth * 0.55)) &&
-        rect.height >= Math.max(360, viewportHeight * 0.45) &&
-        rect.left <= Math.max(96, viewportWidth * 0.12) &&
-        rect.top <= Math.max(96, viewportHeight * 0.18)
-      );
-    };
-
-    const hasBottomControl = (sidebar) => {
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const controls = Array.from(sidebar.querySelectorAll('button, a, [role="button"], [role="status"], [aria-live], span, div'));
-      return controls.some((control) => {
-        if (!(control instanceof HTMLElement) || !isVisibleElement(control)) return false;
-        const rect = control.getBoundingClientRect();
-        const text = quickControlText(control);
-        const nearBottom = rect.bottom >= sidebarRect.bottom - 260;
-        const compact = rect.width > 0 && rect.width <= 64 && rect.height > 0 && rect.height <= 64;
-        const downloadStatus = text.length <= 80 && /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
-        return nearBottom && (compact || downloadStatus || /\bmobile\b|\bphone\b|\bdevice\b|\bsettings?\b|手机|移动|设备|连接|设置/.test(text));
-      });
-    };
-
-    const addSidebarAncestorsForBottomControls = (candidates) => {
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-      const controls = Array.from(document.querySelectorAll('button, a, [role="button"], [role="status"], [aria-live], span, div'));
-      for (const control of controls) {
-        if (!(control instanceof HTMLElement) || !isVisibleElement(control)) continue;
-        const rect = control.getBoundingClientRect();
-        if (rect.left > 560 || rect.bottom < viewportHeight - 280) continue;
-        const text = quickControlText(control);
-        const compact = rect.width > 0 && rect.width <= 64 && rect.height > 0 && rect.height <= 64;
-        const downloadStatus = text.length <= 80 && /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
-        if (!compact && !downloadStatus && !/\bmobile\b|\bphone\b|\bdevice\b|\bsettings?\b|手机|移动|设备|连接|设置/.test(text)) continue;
-        let node = control.parentElement;
-        while (node && node !== document.body) {
-          if (isSidebarGeometry(node) && !looksLikeSettingsSidebar(node)) candidates.add(node);
-          node = node.parentElement;
-        }
-      }
-    };
-
-    const sidebarScore = (sidebar) => {
-      if (!isSidebarGeometry(sidebar) || looksLikeSettingsSidebar(sidebar)) return -Infinity;
-      const rect = sidebar.getBoundingClientRect();
-      let score = 0;
-      if (rect.left <= 16) score += 4;
-      else if (rect.left <= 80) score += 2;
-      if (rect.width >= 220 && rect.width <= 420) score += 3;
-      if (rect.height >= (window.innerHeight || 0) * 0.75) score += 3;
-      if (looksLikeMainAppSidebar(sidebar)) score += 6;
-      if (hasBottomControl(sidebar)) score += 5;
-      if (/^(aside|nav)$/i.test(sidebar.tagName) || sidebar.getAttribute("role") === "navigation") score += 2;
-      return score;
-    };
-
-    const findUsageSidebar = () => {
-      const primarySidebar = Array.from(document.querySelectorAll(ASIDE_SELECTOR))
-        .find((sidebar) => {
-          if (!(sidebar instanceof HTMLElement) || !isVisibleElement(sidebar)) return false;
-          if (looksLikeSettingsSidebar(sidebar)) return false;
-          const rect = sidebar.getBoundingClientRect();
-          return rect.width >= 150 && rect.height >= 300;
-        });
-      if (primarySidebar instanceof HTMLElement) return primarySidebar;
-      const candidates = new Set(
-        Array.from(document.querySelectorAll(SIDEBAR_CANDIDATE_SELECTOR))
-          .filter((node) => node instanceof HTMLElement),
-      );
-      addSidebarAncestorsForBottomControls(candidates);
-      return Array.from(candidates)
-        .map((sidebar) => ({ sidebar, score: sidebarScore(sidebar) }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score || a.sidebar.getBoundingClientRect().left - b.sidebar.getBoundingClientRect().left)[0]?.sidebar || null;
-    };
-
-    const controlText = (node) =>
-      [
-        node.getAttribute?.("aria-label"),
-        node.getAttribute?.("title"),
-        node.textContent,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-
-    const controlLabelText = (node) =>
-      [node.getAttribute?.("aria-label"), node.getAttribute?.("title")]
-        .filter(Boolean)
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-
-    const isDeviceButton = (button) => {
-      const label = controlLabelText(button);
-      if (/\bmobile\b|\bphone\b|\bdevice\b|手机|移动|设备|连接/.test(label)) return true;
-      const text = controlText(button);
-      return text.length <= 28 && /\bmobile\b|\bphone\b|\bdevice\b|手机|移动|设备|连接/.test(text);
-    };
-
-    const isDownloadStatusNode = (node) => {
-      const text = controlText(node);
-      if (!text || text.length > 80) return false;
-      return /\bdownloading\b|\bdownload\b|\bupdating\b|\binstalling\b|正在下载|下载中|更新中|正在更新|安装中/.test(text);
-    };
-
-    const isSettingsButton = (button) => {
-      const text = controlText(button);
-      return /\bsettings?\b|preferences?|设置|偏好/.test(text);
-    };
-
-    const isProfileButton = (button) => {
-      const text = controlText(button);
-      return /\bprofile\b|\baccount\b|个人资料|账户|账号/.test(text);
-    };
-
-    const isBottomUtilityButton = (button) => {
-      const text = controlText(button);
-      return /\bvoice\b|\bhelp\b|语音|帮助/.test(text);
-    };
-
-    const isNearSidebarBottom = (sidebar, node) => {
-      if (!(sidebar instanceof HTMLElement) || !(node instanceof HTMLElement)) return false;
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const rect = node.getBoundingClientRect();
-      const bottomBand = Math.min(Math.max(sidebarRect.height * 0.22, 120), 240);
-      const visibleBottom = Math.min(
-        sidebarRect.bottom,
-        window.innerHeight || document.documentElement.clientHeight || sidebarRect.bottom,
-      );
-      return (
-        rect.top < visibleBottom &&
-        rect.bottom <= visibleBottom + 8 &&
-        rect.bottom >= visibleBottom - bottomBand
-      );
-    };
-
-    const isUsageControlNode = (node) =>
-      node.closest?.('[data-codexpp="usage-slot"], [data-codexpp="usage-box"], [data-codexpp="usage-boxes"]');
-
-    const isSidebarContentRow = (node) => Boolean(
-      node?.closest?.(
-        '[data-app-action-sidebar-thread-row], ' +
-        '[data-app-action-sidebar-project-row], ' +
-        '[data-app-action-sidebar-project-list-id], ' +
-        '[role="listitem"]',
-      ),
-    );
-
-    const isBottomToolbarRow = (sidebar, row) => {
-      if (
-        !(sidebar instanceof HTMLElement) ||
-        !(row instanceof HTMLElement) ||
-        isSidebarContentRow(row)
-      ) {
-        return false;
-      }
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const rect = row.getBoundingClientRect();
-      const style = window.getComputedStyle(row);
-      if (
-        style.display !== "flex" ||
-        rect.width < sidebarRect.width * 0.75 ||
-        rect.height < 36 ||
-        rect.height > 80 ||
-        rect.bottom < sidebarRect.bottom - 20 ||
-        rect.bottom > sidebarRect.bottom + 8
-      ) {
-        return false;
-      }
-      const controls = Array.from(row.querySelectorAll('button, a, [role="button"]'))
-        .filter((control) => control instanceof HTMLElement && !isUsageControlNode(control));
-      return controls.some(isProfileButton) && controls.some(isBottomUtilityButton);
-    };
-
-    const nearestBottomToolbar = (sidebar, control) => {
-      let row = control;
-      while (row && row !== document.body && row !== sidebar.parentElement) {
-        if (isBottomToolbarRow(sidebar, row)) return row;
-        row = row.parentElement;
-      }
-      return null;
-    };
-
-    const nearestControlRow = (sidebar, button) => {
-      if (isSidebarContentRow(button)) return null;
-      const sidebarRect = sidebar.getBoundingClientRect();
-      let row = button.parentElement;
-      while (row && row !== document.body && row !== sidebar.parentElement) {
-        if (!(row instanceof HTMLElement)) break;
-        if (isSidebarContentRow(row)) return null;
-        const rect = row.getBoundingClientRect();
-        const style = window.getComputedStyle(row);
-        const buttonCount = row.querySelectorAll('button, a, [role="button"]').length;
-        const insideSidebar =
-          rect.left >= sidebarRect.left - 8 &&
-          rect.right <= sidebarRect.right + 8;
-        const nearBottom = isNearSidebarBottom(sidebar, row);
-        const looksLikeControlLayer =
-          insideSidebar &&
-          nearBottom &&
-          rect.height > 0 &&
-          rect.height <= 128 &&
-          (style.display === "flex" || style.display === "grid" || buttonCount >= 2);
-        if (looksLikeControlLayer) return row;
-        row = row.parentElement;
-      }
-      return null;
-    };
-
-    const nearestBottomStatusRow = (sidebar, node) => {
-      const sidebarRect = sidebar.getBoundingClientRect();
-      let row = node.parentElement;
-      while (row && row !== document.body && row !== sidebar.parentElement) {
-        if (!(row instanceof HTMLElement)) break;
-        const rect = row.getBoundingClientRect();
-        const style = window.getComputedStyle(row);
-        const insideSidebar =
-          rect.left >= sidebarRect.left - 8 &&
-          rect.right <= sidebarRect.right + 8;
-        const nearBottom = isNearSidebarBottom(sidebar, row);
-        const compactStatusLayer =
-          insideSidebar &&
-          nearBottom &&
-          rect.height > 0 &&
-          rect.height <= 96 &&
-          (style.display === "flex" || style.display === "grid" || isDownloadStatusNode(row));
-        if (compactStatusLayer) return row;
-        row = row.parentElement;
-      }
-      return null;
-    };
-
-    const createInlineSlot = (row, anchor, mode = "controls-inline") => {
-      const existing = row.querySelector(':scope > [data-codexpp="usage-slot"]');
-      if (existing instanceof HTMLElement) return existing;
-      const slot = document.createElement("div");
-      slot.dataset.codexpp = "usage-slot";
-      slot.dataset.codexppUsageSlot = mode;
-      slot.className = "flex shrink-0 items-center";
-      if (anchor?.parentElement === row) {
-        row.insertBefore(slot, anchor.nextSibling);
-      }
-      else row.appendChild(slot);
-      return slot;
-    };
-
-    const createFallbackSlot = (sidebar) => {
-      const existing = sidebar.querySelector(':scope > [data-codexpp="usage-slot"]');
-      if (existing instanceof HTMLElement) return existing;
-      const slot = document.createElement("div");
-      slot.dataset.codexpp = "usage-slot";
-      slot.dataset.codexppUsageSlot = "sidebar-floating-fallback";
-      slot.className = "flex items-center";
-      slot.style.position = "absolute";
-      slot.style.right = "0.75rem";
-      slot.style.bottom = "0.75rem";
-      slot.style.zIndex = "30";
-      sidebar.appendChild(slot);
-      return slot;
-    };
-
-    const createBottomToolbarSlot = (toolbar) => {
-      const existing = toolbar.querySelector(':scope > [data-codexpp="usage-slot"]');
-      if (existing instanceof HTMLElement) return existing;
-      const slot = document.createElement("div");
-      slot.dataset.codexpp = "usage-slot";
-      slot.dataset.codexppUsageSlot = "bottom-toolbar-inline";
-      slot.className = "flex shrink-0 items-center";
-      toolbar.appendChild(slot);
-      return slot;
-    };
-
-    const isValidUsageSlot = (sidebar, slot) => {
-      if (
-        !(slot instanceof HTMLElement) ||
-        !(slot.parentElement instanceof HTMLElement) ||
-        !slot.isConnected ||
-        !sidebar.contains(slot)
-      ) {
-        return false;
-      }
-      const mode = slot.dataset.codexppUsageSlot;
-      if (mode === "sidebar-floating-fallback") {
-        return slot.parentElement === sidebar;
-      }
-      const row = slot.parentElement;
-      if (isSidebarContentRow(row) || !isNearSidebarBottom(sidebar, row)) return false;
-      if (mode === "bottom-toolbar-inline") return isBottomToolbarRow(sidebar, row);
-      if (mode === "status-inline") return isDownloadStatusNode(row);
-      if (mode !== "controls-inline") return false;
-      return Array.from(row.querySelectorAll('button, a, [role="button"]')).some(
-        (control) =>
-          control instanceof HTMLElement &&
-          !isUsageControlNode(control) &&
-          !isSidebarContentRow(control) &&
-          (isDeviceButton(control) || isSettingsButton(control)),
-      );
-    };
-
-    const findSidebarSlot = () => {
-      const navigation = document.querySelector('aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
-      if (navigation && isVisibleElement(navigation)) {
-        let slot = navigation.querySelector(':scope > [data-codexpp="usage-slot"]');
-        if (!slot) {
-          slot = document.createElement("div");
-          slot.dataset.codexpp = "usage-slot";
-          slot.dataset.codexppUsageSlot = "navigation-rail";
-          slot.className = "flex shrink-0 items-center justify-center";
-          const profile = navigation.querySelector('button[aria-label="打开个人资料菜单"], button[aria-label="Open profile menu"]');
-          const utilities = Array.from(navigation.children).find((child) => profile && child.contains(profile));
-          navigation.insertBefore(slot, utilities || null);
-        }
-        return slot;
-      }
-      const sidebar = findUsageSidebar();
-      if (!sidebar) return null;
-      for (const slot of sidebar.querySelectorAll('[data-codexpp="usage-slot"]')) {
-        if (!isValidUsageSlot(sidebar, slot)) slot.remove();
-      }
-      const existingSlots = Array.from(
-        sidebar.querySelectorAll('[data-codexpp="usage-slot"]'),
-      ).filter((slot) => isValidUsageSlot(sidebar, slot));
-      const existingInline = existingSlots.find((slot) =>
-        slot.dataset.codexppUsageSlot === "controls-inline" ||
-        slot.dataset.codexppUsageSlot === "status-inline" ||
-        slot.dataset.codexppUsageSlot === "bottom-toolbar-inline",
-      );
-      if (existingInline instanceof HTMLElement) return existingInline;
-      const existingFallback = existingSlots.find(
-        (slot) => slot.dataset.codexppUsageSlot === "sidebar-floating-fallback",
-      );
-
-      const controls = Array.from(sidebar.querySelectorAll('button, a, [role="button"]'))
-        .filter((button) =>
-          button instanceof HTMLElement &&
-          isVisibleElement(button) &&
-          isNearSidebarBottom(sidebar, button) &&
-          !isUsageControlNode(button) &&
-          !isSidebarContentRow(button),
-        );
-      const bottomToolbarControl = controls.find(
-        (control) => isProfileButton(control) || isBottomUtilityButton(control),
-      );
-      const bottomToolbar = bottomToolbarControl
-        ? nearestBottomToolbar(sidebar, bottomToolbarControl)
-        : null;
-      if (bottomToolbar) {
-        existingFallback?.remove();
-        return createBottomToolbarSlot(bottomToolbar);
-      }
-      const deviceControls = controls.filter(isDeviceButton);
-      const settingsControls = controls.filter(isSettingsButton);
-      const preferredControls = deviceControls.length
-        ? deviceControls
-        : settingsControls;
-      const ordered = preferredControls.sort((a, b) => {
-        const ar = a.getBoundingClientRect();
-        const br = b.getBoundingClientRect();
-        return br.right - ar.right || br.bottom - ar.bottom;
-      });
-
-      for (const button of ordered) {
-        const row = nearestControlRow(sidebar, button);
-        if (row) {
-          existingFallback?.remove();
-          return createInlineSlot(row, button);
-        }
-      }
-
-      const statusAnchors = Array.from(
-        sidebar.querySelectorAll('[role="status"], [aria-live], [aria-label], [title], span, div'),
-      )
-        .filter((node) =>
-          node instanceof HTMLElement &&
-          isVisibleElement(node) &&
-          isNearSidebarBottom(sidebar, node) &&
-          !isUsageControlNode(node) &&
-          isDownloadStatusNode(node),
-        )
-        .sort((a, b) => {
-          const ar = a.getBoundingClientRect();
-          const br = b.getBoundingClientRect();
-          return br.bottom - ar.bottom || br.right - ar.right;
-        });
-
-      for (const anchor of statusAnchors) {
-        const row = nearestBottomStatusRow(sidebar, anchor);
-        if (row) {
-          existingFallback?.remove();
-          return createInlineSlot(row, anchor, "status-inline");
-        }
-      }
-
-      if (existingFallback instanceof HTMLElement) return existingFallback;
-      return createFallbackSlot(sidebar);
-    };
-
     const displaySnapshot = () =>
       accountMode === "api"
         ? {
@@ -5145,8 +5145,7 @@ const FEATURES = {
       }
     };
 
-    // Initial render from persisted snapshot (so first paint isn't empty
-    // even before the user opens the popover).
+    // Mount only when the layout's final anchor is ready.
     ensureMounted(true);
 
     // ── observers ─────────────────────────────────────────────────────
@@ -5210,6 +5209,73 @@ const FEATURES = {
       for (const slot of document.querySelectorAll('[data-codexpp="usage-floating-slot"]')) {
         slot.remove();
       }
+    };
+  },
+
+  "app-theme-toggle"(api) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.codexpp = "app-theme-toggle";
+    styleSidebarControl(button);
+    let disposed = false;
+    let hovering = false;
+    const render = () => {
+      const dark = document.documentElement.dataset.theme === "dark";
+      const zh = /^zh/i.test(document.documentElement.lang || "");
+      const label = dark ? (zh ? "切换为浅色外观" : "Switch to light appearance") : (zh ? "切换为深色外观" : "Switch to dark appearance");
+      const state = `${dark}:${zh}:${hovering}`;
+      if (button.dataset.state === state) return;
+      button.dataset.state = state;
+      button.title = label;
+      button.setAttribute("aria-label", label);
+      button.innerHTML = hovering
+        ? `<span style="font-size:9px;color:var(--color-text-tertiary,inherit)">${zh ? "切换" : "Switch"}</span><span style="font-size:12px;font-weight:600">${dark ? (zh ? "浅色" : "Light") : (zh ? "深色" : "Dark")}</span>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dark ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>' : '<path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/>'}</svg>`;
+    };
+    const refresh = () => {
+      const slot = findSidebarSlot();
+      if (!slot) { button.remove(); return; }
+      if (button.parentElement !== slot) {
+        const previousSlot = button.parentElement;
+        slot.insertBefore(button, slot.firstChild);
+        if (previousSlot && !previousSlot.children.length) previousSlot.remove();
+      }
+      render();
+    };
+    button.onmouseenter = () => { hovering = true; render(); };
+    button.onmouseleave = () => { hovering = false; render(); };
+    button.onclick = async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      try {
+        await sessionThreadActions.setAppTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+      } catch (error) {
+        api.log.warn("App theme switch failed", error);
+        button.title = /^zh/i.test(document.documentElement.lang || "") ? "切换失败，请重试或在 Codex 外观设置中切换" : "Could not switch; retry or use Codex appearance settings";
+      } finally {
+        if (!disposed) button.disabled = false;
+      }
+    };
+    const style = document.createElement("style");
+    style.textContent = '[data-codexpp="usage-slot"]:has(> [data-codexpp="app-theme-toggle"]) { flex-direction: column; gap: 4px; }';
+    document.head.appendChild(style);
+    let frame = 0;
+    const layoutObserver = new MutationObserver(() => {
+      if (!button.isConnected && !frame) frame = window.requestAnimationFrame(() => { frame = 0; refresh(); });
+    });
+    layoutObserver.observe(document.documentElement, { childList: true, subtree: true });
+    const themeObserver = new MutationObserver(render);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "lang"] });
+    refresh();
+    return () => {
+      disposed = true;
+      layoutObserver.disconnect();
+      themeObserver.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
+      const slot = button.parentElement;
+      button.remove();
+      if (slot && !slot.children.length) slot.remove();
+      style.remove();
     };
   },
 
@@ -8677,6 +8743,11 @@ function formatCreditAmount(value) {
  * The returned element exposes `_refresh(snapshot)` so callers can update
  * values in place without unmount/remount.
  */
+function styleSidebarControl(button) {
+  button.className = "cursor-interaction rounded-lg bg-token-foreground/5 text-token-text-primary hover:bg-primary-ghost-hover transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+  button.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:36px;height:40px;padding:3px 0;border:0;line-height:1.2;flex:none";
+}
+
 function renderUsageBox(api, snapshot, compact = false) {
   const zh = /^zh/i.test(document.documentElement.lang || "");
   const BASE_ORDER = ["5h", "weekly"];
@@ -8710,8 +8781,7 @@ function renderUsageBox(api, snapshot, compact = false) {
   right.className = "shrink-0 tabular-nums flex items-center gap-1";
 
   if (compact) {
-    btn.className = "cursor-interaction rounded-lg hover:bg-primary-ghost-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
-    btn.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;height:40px;padding:3px 0;border:0;line-height:1.2";
+    styleSidebarControl(btn);
     left.style.cssText = "font-size:9px;color:var(--color-text-tertiary,inherit)";
     right.style.cssText = "font-size:12px;font-weight:600;letter-spacing:-.3px";
   }
@@ -9130,7 +9200,7 @@ function writeFlag(api, id, on) {
       {
         id: "usage",
         title: "额度",
-        features: ["show-usage-in-sidebar", "hide-usage-alert", "hide-upgrade-prompts"],
+        features: ["show-usage-in-sidebar", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
       },
       {
         id: "sidebar",

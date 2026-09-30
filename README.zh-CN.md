@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.4.20-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.21-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.20 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.4.21 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.4.20 修复重启后直接打开只有行内或表格公式的 Markdown 时公式不显示的问题：通过原生编辑器发现内置 KaTeX，无需先打开块级公式。支持并已验证 Windows Codex 26.924.2738.0。详见[版本更新说明](docs/RELEASE-1.4.20.md)。
+1.4.21 新增独立的明暗主题按钮，采用额度控件的悬停样式，并取消额度启动时的临时位置。已在 Windows Codex 26.928.2636.0 中检查侧栏运行行为。详见[版本更新说明](docs/RELEASE-1.4.21.md)。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.20`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.21`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -59,6 +59,7 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 | 项目背景和颜色 | 开启 | 稳定 |
 | 会话项目着色 | 开启 | 已归属项目的会话稳定可用；普通对话保持默认样式 |
 | 5 小时 / Weekly / Credit 额度 | 开启 | 当前页面能提供额度数据时稳定可用 |
+| 明暗主题切换按钮 | 开启 | 独立侧栏按钮，切换并保存 Codex 的浅色 / 深色外观；悬停显示目标外观 |
 | 隐藏额度耗尽提示 | 开启 | 稳定 |
 | 隐藏 Plus/Pro 升级提示 | 开启 | 稳定；保留 Codex 软件更新提示 |
 | 公式与本地图片预览 | 开启 | 对 `.md` 和 `.markdown` 预览稳定可用；不接管原生表格 |
@@ -101,6 +102,9 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 - 启用 CC Switch 的“同步会话”后，历史合并仍由 CC Switch/Codex 管理；Better UI Imropvement 既不读取会话文件，也不会创建第二份会话数据库。
 
 ## 额度数据规则
+
+- 控件等待当前布局的目标位置就绪后直接显示，不再先显示在旧版临时位置；仍支持旧版底栏控件布局。
+- **设置 → Script-Loader → 界面增强 → 额度** 提供独立的明暗主题按钮开关。关闭额度显示后按钮仍可使用，与紧凑额度控件共用悬停样式，并保存 Codex 原生外观偏好。
 
 - 启动后不会把保存的旧额度快照当作当前数据展示。
 - 只接受当前 `/wham/usage` 返回的主账户数据；不会使用旧快照、renderer 事件或页面文本作为额度来源。

@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.20-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.21-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.20 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.4.21 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.4.20 restores inline and table formulas when a Markdown preview is opened before Codex has loaded its block-math renderer. It discovers bundled KaTeX through the native editor without requiring a block formula to be opened first. Supported and verified with Codex 26.924.2738.0 on Windows. See the [release notes](docs/RELEASE-1.4.20.md).
+Version 1.4.21 adds an independent light/dark theme button with usage-style hover feedback and removes temporary usage placement during startup. Runtime sidebar behavior was checked with Codex 26.928.2636.0 on Windows. See the [release notes](docs/RELEASE-1.4.21.md).
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.20`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.21`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -59,6 +59,7 @@ Codex++ users may continue using the market's frozen `1.2.4` build, but it is un
 | Project backgrounds and colors | On | Stable |
 | Conversation project colors | On | Stable for assigned project conversations; ordinary chats keep the default style |
 | 5-hour / Weekly / Credit usage | On | Stable when the current page exposes usage data |
+| App theme toggle | On | Independent sidebar button switches and saves Codex's light/dark appearance; shows the target mode on hover |
 | Hide quota-exhaustion prompts | On | Stable |
 | Hide Plus/Pro upgrade prompts | On | Stable; Codex app-update notices remain visible |
 | Formula and local-image preview | On | Stable for `.md` and `.markdown` previews; native tables are untouched |
@@ -101,6 +102,9 @@ Current Codex builds own conversation discovery, grouping, and pagination. Bette
 - When CC Switch unified session history is enabled, CC Switch/Codex still own the merge. Better UI Imropvement neither reads session files nor creates a second conversation database.
 
 ## Usage-data behavior
+
+- The widget waits for the current layout's anchor before appearing, without first mounting in a temporary legacy position. Legacy bottom controls remain supported.
+- **Settings → Script-Loader → UI Improvements → Usage** includes an independent app theme button switch. The button stays available with usage disabled and uses the same hover styling as the compact usage control. It saves Codex's native appearance preference.
 
 - Saved quota snapshots are not presented as fresh data after startup.
 - The widget accepts only current main-account data from `/wham/usage`; persisted snapshots, renderer events, and page text are not used as quota sources.

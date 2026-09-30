@@ -35,7 +35,7 @@ test('split navigation uses one rail control before profile utilities without a 
   const navigation={children:[utilities],querySelector:selector=>selector.startsWith(':scope')?slot:profile,insertBefore:(node,before)=>{assert.equal(before,utilities);slot=node}};
   const context=vm.createContext({document:{querySelector:()=>navigation,createElement:()=>({dataset:{}})},
     isVisibleElement:()=>visible,findUsageSidebar:()=>null});
-  vm.runInContext(source.slice(source.indexOf('    const findSidebarSlot ='),source.indexOf('    const displaySnapshot ='))+'\nglobalThis.findSlot=findSidebarSlot;',context);
+  vm.runInContext(source.slice(source.indexOf('    const findSidebarSlot ='),source.indexOf('    return findSidebarSlot;'))+'\nglobalThis.findSlot=findSidebarSlot;',context);
   assert.equal(context.findSlot().dataset.codexppUsageSlot,'navigation-rail');
   assert.equal(context.findSlot(),slot);
   visible=false;
