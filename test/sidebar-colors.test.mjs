@@ -55,3 +55,62 @@ test("native project headers color their title and icon without an aria-label", 
   assert.equal(title.marks.color, "title");
   assert.equal(icon.marks.color, "icon");
 });
+
+test("the project frame encloses its sibling chat list without individual chat colors", () => {
+  const backgrounds = source.slice(source.indexOf('  "sidebar-project-backgrounds"(api) {'));
+  const colors = source.slice(source.indexOf('  "sidebar-conversation-colors"(api) {'));
+  const candidates = backgrounds.match(/    const candidateRows = \(sidebar\) =>[\s\S]*?rows.indexOf\(node\) === index\);/u)[0];
+  const constants = colors.match(/    const THREAD_SELECTOR =[\s\S]*?    const PALETTE_FALLBACK/u)[0].replace(/    const PALETTE_FALLBACK$/u, "");
+  const functions = ["attrValue", "projectInfo", "projectForThread"].map(name =>
+    colors.match(new RegExp(`    const ${name} = \\([\\s\\S]*?\\n    \\};`, "u"))[0],
+  ).join("\n");
+  class Element {
+    constructor(attributes = {}, children = []) {
+      this.attributes = attributes;
+      this.children = children;
+      for (const child of children) child.parentElement = this;
+    }
+    getAttribute(name) { return this.attributes[name] ?? null; }
+    matches(selector) {
+      return selector.split(",").some(part => {
+        const base = part.trim();
+        if (base.startsWith(".")) return this.attributes.class === base.slice(1).replaceAll("\\", "");
+        const attrs = [...base.matchAll(/\[([\w-]+)(?:=['"]?([^\]'"\s]+)['"]?)?\]/gu)];
+        return attrs.length > 0 && attrs.every(([, name, value]) =>
+          name in this.attributes && (value === undefined || this.attributes[name] === value),
+        );
+      });
+    }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+    querySelectorAll(selector) { return this.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]); }
+    closest(selector) { return this.matches(selector) ? this : this.parentElement?.closest(selector) ?? null; }
+  }
+  const header = new Element({"data-app-action-sidebar-project-row": "", "data-app-action-sidebar-project-id": "project-1", "data-app-action-sidebar-project-label": "ICASSP"});
+  const chat = () => new Element({role: "button", "aria-label": "Chat", "data-app-action-sidebar-thread-row": ""}, [new Element({"data-thread-title": "true"})]);
+  const threads = [chat(), chat(), chat()];
+  const container = new Element({"data-sidebar-project-kind": "local", "data-sidebar-project-container-id": "project:project-1"}, [
+    new Element({}, [header, new Element({}, [new Element({role: "list"}, threads.map(thread => new Element({role: "listitem"}, [thread])))])]),
+  ]);
+  const unrelated = chat();
+  const sidebar = new Element({}, [container, unrelated]);
+  const run = vm.runInNewContext(`${constants}\n${functions}\n${candidates}\n({candidateRows, projectForThread})`, {
+    HTMLElement: Element, normalize: value => String(value || "").trim().toLowerCase(),
+    isProjectRow: () => true,
+    reactProjectInfo: () => false, secondaryProjectInfo: () => null,
+  });
+  const rows = run.candidateRows(sidebar);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0], container, "background and border must be applied to the whole project container");
+  const index = {byId: new Map(), byList: new Map()};
+  for (const thread of threads) {
+    assert.equal(run.projectForThread(thread, index), null, "project children must not receive individual conversation colors");
+  }
+  assert.equal(run.projectForThread(unrelated, index), null, "a nearby project must not color an unassigned chat");
+  const legacy = new Element({"data-app-action-sidebar-thread-row": "", "data-app-action-sidebar-project-id": "legacy"});
+  assert.equal(run.projectForThread(legacy, index).id, "legacy");
+  const legacyGroup = new Element({role: "listitem", "aria-label": "Legacy", class: "group/cwd"}, [
+    new Element({"data-app-action-sidebar-project-row": ""}), legacy,
+  ]);
+  assert.equal(run.candidateRows(legacyGroup)[0], legacyGroup);
+  assert.equal(run.projectForThread(legacy, index), null);
+});

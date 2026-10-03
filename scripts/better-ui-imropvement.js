@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.21";
+  const VERSION = "1.4.22";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -112,6 +112,124 @@
   const FEATURE_DEFAULTS = Object.freeze(Object.fromEntries(
     FEATURE_DEFINITIONS.map(({ id, defaultEnabled }) => [id, defaultEnabled]),
   ));
+
+  const PROJECT_THEME_STORAGE_KEY = "sidebar-project-theme";
+  const PROJECT_THEME_STYLE_ID = "better-ui-project-theme";
+  const PROJECT_THEME_COLORS = { blue: "蓝色", green: "绿色", yellow: "黄色", red: "红色", pink: "粉色", purple: "紫色", gray: "灰色" };
+  const PROJECT_THEME_STYLE_FIELDS = {
+    radius: ["项目圆角（px）", 0, 20], borderWidth: ["边框宽度（px）", 0, 3],
+    hoverOpacity: ["项目悬停强调（%）", 0, 30],
+    stripeWidth: ["会话色条（px）", 0, 6], // Retained for schema-v1 theme imports; no longer rendered.
+    conversationOpacity: ["会话底色（%）", 0, 30], conversationHoverOpacity: ["会话悬停（%）", 0, 40],
+    conversationActiveOpacity: ["选中会话（%）", 0, 50],
+  };
+
+  function createProjectTheme(preset = "codex") {
+    const presets = {
+      codex: { name: "Codex 默认", surface: ["#ffffff", "#181818"], border: ["#e6e6e6", "#303030"], radius: 8,
+        light: ["#0069cc", "#087c3c", "#806200", "#bf3633", "#b33170", "#7540c5", "#666666"],
+        dark: ["#85bfff", "#83cda0", "#d9c681", "#e99c99", "#e6a2c3", "#bda4e8", "#aaaaaa"] },
+      github: { name: "GitHub", surface: ["#ffffff", "#0d1117"], border: ["#d1d9e0", "#30363d"], radius: 6,
+        light: ["#0969da", "#1a7f37", "#9a6700", "#cf222e", "#bf3989", "#8250df", "#59636e"],
+        dark: ["#79c0ff", "#7ee787", "#e3b341", "#ff7b72", "#ff9bce", "#d2a8ff", "#9198a1"] },
+      vscode: { name: "VS Code", surface: ["#f3f3f3", "#1e1e1e"], border: ["#d4d4d4", "#3c3c3c"], radius: 3,
+        light: ["#005fb8", "#327b36", "#795e26", "#b5200d", "#a31565", "#7845a0", "#616161"],
+        dark: ["#9cdcfe", "#b5cea8", "#dcdcaa", "#f48771", "#ce9178", "#c586c0", "#a6a6a6"] },
+    };
+    const config = presets[preset];
+    if (!config) throw new Error("未知主题预设");
+    const mix = (color, surface) => "#" + [1, 3, 5].map(i => Math.round(parseInt(color.slice(i, i + 2), 16) * .05 + parseInt(surface.slice(i, i + 2), 16) * .95).toString(16).padStart(2, "0")).join("");
+    return {
+      schemaVersion: 1, name: config.name, preset, mode: "auto",
+      styles: { radius: config.radius, borderWidth: 1, hoverOpacity: 8, stripeWidth: 0, conversationOpacity: 4, conversationHoverOpacity: 8, conversationActiveOpacity: 12 },
+      variants: Object.fromEntries(["light", "dark"].map((mode, index) => [mode, {
+        surface: config.surface[index],
+        colors: Object.fromEntries(Object.keys(PROJECT_THEME_COLORS).map((id, i) => [id, {
+          accent: config[mode][i], text: config[mode][i], background: mix(config[mode][i], config.surface[index]), border: config.border[index],
+        }])),
+      }])),
+    };
+  }
+
+  function validateProjectTheme(value) {
+    const fail = message => { throw new Error(message); };
+    const record = value => value && typeof value === "object" && !Array.isArray(value);
+    const color = value => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : fail("颜色须为 #RRGGBB 格式");
+    if (!record(value) || value.schemaVersion !== 1) fail("不支持的主题文件版本；请导入 Better UI 导出的 JSON");
+    if (typeof value.name !== "string" || !value.name.trim() || value.name.length > 60) fail("主题名称须为 1–60 个字符");
+    if (!["auto", "light", "dark"].includes(value.mode)) fail("无效的明暗模式");
+    if (!["codex", "github", "vscode", "custom"].includes(value.preset)) fail("无效的预设标识");
+    if (!record(value.styles) || !record(value.variants)) fail("主题缺少样式或明暗配色");
+    const styles = Object.fromEntries(Object.entries(PROJECT_THEME_STYLE_FIELDS).map(([key, [label, min, max]]) => {
+      const number = value.styles[key];
+      if (!Number.isInteger(number) || number < min || number > max) fail(`${label}须为 ${min}–${max} 之间的整数`);
+      return [key, number];
+    }));
+    const variants = Object.fromEntries(["light", "dark"].map(mode => {
+      const variant = value.variants[mode];
+      if (!record(variant) || !record(variant.colors)) fail("主题须同时包含浅色和深色配色");
+      return [mode, { surface: color(variant.surface), colors: Object.fromEntries(Object.keys(PROJECT_THEME_COLORS).map(id => {
+        if (!record(variant.colors[id])) fail(`缺少${PROJECT_THEME_COLORS[id]}配色`);
+        return [id, Object.fromEntries(["accent", "text", "background", "border"].map(key => [key, color(variant.colors[id][key])]))];
+      })) }];
+    }));
+    return { schemaVersion: 1, name: value.name.trim(), preset: value.preset, mode: value.mode, styles, variants };
+  }
+
+  function projectThemeVariables(theme) {
+    const declarations = [];
+    for (const id of Object.keys(PROJECT_THEME_COLORS)) {
+      for (const [field, suffix] of Object.entries({ accent: "tint", text: "text", background: "background", border: "border" })) {
+        declarations.push(`--codexpp-project-${id}-${suffix}:light-dark(${theme.variants.light.colors[id][field]},${theme.variants.dark.colors[id][field]})`);
+      }
+    }
+    for (const [key, value] of Object.entries(theme.styles)) {
+      declarations.push(`--bui-theme-${key}:${value}${["radius", "borderWidth", "stripeWidth"].includes(key) ? "px" : "%"}`);
+    }
+    declarations.push(`--bui-theme-scheme:${theme.mode === "auto" ? "inherit" : theme.mode}`);
+    return declarations.join(";");
+  }
+
+  function projectThemePalette() {
+    return Object.entries(PROJECT_THEME_COLORS).map(([id, label]) => ({
+      id, label, value: `var(--codexpp-project-${id}-tint)`, textValue: `var(--codexpp-project-${id}-text)`,
+    }));
+  }
+
+  function nativeFactoryExport(source, marker) {
+    const position = source.indexOf(marker);
+    if (position < 0) throw new Error(`Codex UI module is missing ${marker}`);
+    const factory = [...source.slice(0, position).matchAll(/(?:var |,)([\w$]+)=([\w$]+)\(\([\w$]+=>\{/g)].at(-1);
+    if (!factory) throw new Error("Codex UI factory was not found");
+    const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wrapper = source.slice(position).match(new RegExp(`(?:var |,)([\\w$]+)=${escape(factory[2])}\\(\\(\\([\\w$,]+\\)=>\\{[\\s\\S]{0,600}?\\.exports=${escape(factory[1])}\\(\\)`));
+    const exported = wrapper && source.slice(source.lastIndexOf("export{")).match(new RegExp(`(?:\\{|,)${escape(wrapper[1])} as ([\\w$]+)`));
+    if (!exported) throw new Error("Codex UI factory export was not found");
+    return exported[1];
+  }
+
+  function nativeChoiceElement(runtime, select, focus = {}) {
+    const { React, Dropdown, Menu } = runtime;
+    const h = React.createElement;
+    const options = [...select.options];
+    return h(Dropdown, {
+      align: "end", disabled: select.disabled,
+      contentStyle: { minWidth: 180 },
+      triggerButton: h("button", {
+        type: "button", className: "bui-native-choice", disabled: select.disabled,
+        ref: focus.onMount,
+        "aria-label": select.getAttribute("aria-label"),
+      }, options.find(option => option.value === select.value)?.textContent || "选择"),
+    }, h(Menu.RadioGroup, {
+      value: select.value,
+      onValueChange(value) {
+        if (select.disabled || !options.some(option => option.value === value && !option.disabled)) return;
+        focus.beforeChange?.();
+        select.value = value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      },
+    }, options.map(option => h(Menu.RadioItem, { key: option.value, value: option.value, disabled: option.disabled }, option.textContent))));
+  }
 
   function reportLifecycle(event, detail = {}) {
     const signature = `${event}:${JSON.stringify(detail)}`;
@@ -7626,50 +7744,7 @@ const FEATURES = {
       "upgrade",
       "upgrade plan",
     ]);
-    const PALETTE = [
-      {
-        id: "blue",
-        label: "Blue",
-        value: "var(--blue-400, #0285ff)",
-        textValue: "var(--codexpp-project-blue-text)",
-      },
-      {
-        id: "green",
-        label: "Green",
-        value: "var(--green-400, #04b84c)",
-        textValue: "var(--codexpp-project-green-text)",
-      },
-      {
-        id: "yellow",
-        label: "Yellow",
-        value: "var(--yellow-400, #ffc300)",
-        textValue: "var(--codexpp-project-yellow-text)",
-      },
-      {
-        id: "red",
-        label: "Red",
-        value: "var(--red-400, #fa423e)",
-        textValue: "var(--codexpp-project-red-text)",
-      },
-      {
-        id: "pink",
-        label: "Pink",
-        value: "var(--pink-400, #ff66ad)",
-        textValue: "var(--codexpp-project-pink-text)",
-      },
-      {
-        id: "purple",
-        label: "Purple",
-        value: "var(--purple-400, #924ff7)",
-        textValue: "var(--codexpp-project-purple-text)",
-      },
-      {
-        id: "gray",
-        label: "Gray",
-        value: "var(--color-token-text-secondary)",
-        textValue: "var(--codexpp-project-gray-text)",
-      },
-    ];
+    const PALETTE = projectThemePalette();
     window.__codexppSidebarProjectPalette = PALETTE;
     const colorPrefsCacheKey = "__codexppSidebarProjectColorPrefs";
     let colorPrefs = readColorPrefs();
@@ -7681,28 +7756,12 @@ const FEATURES = {
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      :root {
-        /* Follow Codex's effective theme, including an app override of the OS theme. */
-        --codexpp-project-blue-text: light-dark(#0069cc, #85bfff);
-        --codexpp-project-green-text: light-dark(#087c3c, #83cda0);
-        --codexpp-project-yellow-text: light-dark(#806200, #d9c681);
-        --codexpp-project-red-text: light-dark(#bf3633, #e99c99);
-        --codexpp-project-pink-text: light-dark(#b33170, #e6a2c3);
-        --codexpp-project-purple-text: light-dark(#7540c5, #bda4e8);
-        --codexpp-project-gray-text: var(--color-token-text-secondary, light-dark(#666, #aaa));
-      }
-
       [${ATTR}="row"] {
         position: relative !important;
-        border-radius: var(--radius-lg, 0.5rem) !important;
-        background-color: light-dark(
-          color-mix(in srgb, var(--codexpp-project-tint, #888) 5%, transparent),
-          color-mix(in srgb, var(--codexpp-project-text-color, #aaa) 6%, transparent)
-        ) !important;
-        box-shadow: inset 0 0 0 1px light-dark(
-          color-mix(in srgb, var(--codexpp-project-text-color, #666) 12%, transparent),
-          rgb(255 255 255 / 6%)
-        ) !important;
+        color-scheme: var(--bui-theme-scheme, inherit);
+        border-radius: var(--bui-theme-radius) !important;
+        background-color: var(--codexpp-project-background) !important;
+        box-shadow: inset 0 0 0 var(--bui-theme-borderWidth) var(--codexpp-project-border) !important;
       }
 
       [${ATTR}="row"][style*="--codexpp-project-blue-token-override"] {
@@ -7728,10 +7787,7 @@ const FEATURES = {
       }
 
       [${ATTR}="row"]:hover {
-        background-color: light-dark(
-          color-mix(in srgb, var(--codexpp-project-tint, #888) 9%, transparent),
-          color-mix(in srgb, var(--codexpp-project-text-color, #aaa) 10%, transparent)
-        ) !important;
+        background-color: color-mix(in srgb, var(--codexpp-project-tint) var(--bui-theme-hoverOpacity), var(--codexpp-project-background)) !important;
       }
 
       [${ATTR}="icon"],
@@ -7859,7 +7915,8 @@ const FEATURES = {
       Array.from(sidebar.querySelectorAll("[data-app-action-sidebar-project-row], div[role='listitem'][aria-label]"))
         .map((node) => {
           if (!node.matches("[data-app-action-sidebar-project-row]")) return node;
-          return node.closest("div[role='listitem'][aria-label]") || node;
+          return node.closest("[data-sidebar-project-kind][data-sidebar-project-container-id]") ||
+            node.closest("div[role='listitem'][aria-label]") || node;
         })
         .filter(isProjectRow)
         .filter((node, index, rows) => rows.indexOf(node) === index);
@@ -7872,6 +7929,8 @@ const FEATURES = {
         if ("style" in node) {
           node.style.removeProperty("--codexpp-project-tint");
           node.style.removeProperty("--codexpp-project-text-color");
+          node.style.removeProperty("--codexpp-project-background");
+          node.style.removeProperty("--codexpp-project-border");
           node.style.removeProperty("--codexpp-project-blue-token-override");
           node.style.removeProperty("--codexpp-project-link-token-override");
         }
@@ -7950,6 +8009,8 @@ const FEATURES = {
         setAttr(row, "data-codexpp-sidebar-project-expanded", String(isExpandedProject(row)));
         setStyleVar(row, "--codexpp-project-tint", tintFor(info));
         setStyleVar(row, "--codexpp-project-text-color", textColorFor(info));
+        setStyleVar(row, "--codexpp-project-background", `var(--codexpp-project-${paletteFor(info).id}-background)`);
+        setStyleVar(row, "--codexpp-project-border", `var(--codexpp-project-${paletteFor(info).id}-border)`);
         setOptionalStyleVar(row, "--codexpp-project-blue-token-override", blueTokenOverrideFor(info));
         setOptionalStyleVar(row, "--codexpp-project-link-token-override", linkTokenOverrideFor(info));
         markProjectParts(row, label);
@@ -8098,22 +8159,13 @@ const FEATURES = {
       };
     };
 
-    const NATIVE_SWATCH_COLORS = Object.freeze({
-      blue: "#0285ff",
-      green: "#04b84c",
-      yellow: "#ffc300",
-      red: "#fa423e",
-      pink: "#ff66ad",
-      purple: "#924ff7",
-      gray: "#8e8e93",
-    });
-
     const nativeColorSwatchIcon = (colorId) => {
       if (colorId === "none") {
         const svg = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="6.25" stroke="#8e8e93" stroke-width="1.5"/><path d="M5.6 14.4 14.4 5.6" stroke="#8e8e93" stroke-width="1.5" stroke-linecap="round"/></svg>`;
         return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
       }
-      const fill = NATIVE_SWATCH_COLORS[colorId];
+      const mode = projectTheme.mode === "auto" ? (getComputedStyle(document.documentElement).colorScheme.includes("dark") ? "dark" : "light") : projectTheme.mode;
+      const fill = projectTheme.variants[mode].colors[colorId]?.accent;
       const gradient = colorId === "auto"
         ? `<defs><linearGradient id="g" x1="3" y1="3" x2="17" y2="17" gradientUnits="userSpaceOnUse"><stop stop-color="#0285ff"/><stop offset=".34" stop-color="#04b84c"/><stop offset=".67" stop-color="#ffc300"/><stop offset="1" stop-color="#fa423e"/></linearGradient></defs>`
         : "";
@@ -8263,6 +8315,8 @@ const FEATURES = {
       row.removeAttribute("data-codexpp-sidebar-project-expanded");
       row.style.removeProperty("--codexpp-project-tint");
       row.style.removeProperty("--codexpp-project-text-color");
+      row.style.removeProperty("--codexpp-project-background");
+      row.style.removeProperty("--codexpp-project-border");
       row.style.removeProperty("--codexpp-project-blue-token-override");
       row.style.removeProperty("--codexpp-project-link-token-override");
       row.querySelectorAll(`[${ATTR}]`).forEach((node) => node.removeAttribute(ATTR));
@@ -8393,36 +8447,7 @@ const FEATURES = {
       "data-app-action-sidebar-project-label",
       "data-project-name",
     ];
-    const PALETTE_FALLBACK = [
-      {
-        id: "blue",
-        value: "var(--blue-400, #0285ff)",
-      },
-      {
-        id: "green",
-        value: "var(--green-400, #04b84c)",
-      },
-      {
-        id: "yellow",
-        value: "var(--yellow-400, #ffc300)",
-      },
-      {
-        id: "red",
-        value: "var(--red-400, #fa423e)",
-      },
-      {
-        id: "pink",
-        value: "var(--pink-400, #ff66ad)",
-      },
-      {
-        id: "purple",
-        value: "var(--purple-400, #924ff7)",
-      },
-      {
-        id: "gray",
-        value: "var(--color-token-text-secondary)",
-      },
-    ];
+    const PALETTE_FALLBACK = projectThemePalette();
     let disposed = false;
     let activeSidebar = null;
     let applyTimer = 0;
@@ -8435,15 +8460,14 @@ const FEATURES = {
     style.textContent = `
       [${ATTR}="row"] {
         position: relative !important;
+        color-scheme: var(--bui-theme-scheme, inherit);
         box-sizing: border-box !important;
-        border-inline-start: 3px solid color-mix(
-          in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 78%,
-          transparent
-        ) !important;
+        border-inline-start: 0 !important;
+        border-radius: max(8px, var(--bui-theme-radius, 8px)) !important;
+        transition: background-color 140ms ease, box-shadow 140ms ease;
         background-color: color-mix(
           in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 6%,
+          var(--codexpp-project-tint, var(--color-token-text-secondary)) var(--bui-theme-conversationOpacity),
           transparent
         ) !important;
       }
@@ -8451,18 +8475,24 @@ const FEATURES = {
       [${ATTR}="row"]:hover {
         background-color: color-mix(
           in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 10%,
+          var(--codexpp-project-tint, var(--color-token-text-secondary)) var(--bui-theme-conversationHoverOpacity),
           transparent
         ) !important;
       }
 
       [${ATTR}="row"][aria-selected="true"],
+      [${ATTR}="row"][data-app-action-sidebar-thread-selected="true"],
       [${ATTR}="row"][data-app-action-sidebar-thread-active="true"] {
         background-color: color-mix(
           in srgb,
-          var(--codexpp-project-tint, var(--color-token-text-secondary)) 14%,
-          var(--color-token-list-hover-background, transparent)
+          var(--codexpp-project-tint, var(--color-token-text-secondary)) var(--bui-theme-conversationActiveOpacity),
+          transparent
         ) !important;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--codexpp-project-tint) 24%, transparent) !important;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        [${ATTR}="row"] { transition: none; }
       }
     `;
     document.head.appendChild(style);
@@ -8583,6 +8613,8 @@ const FEATURES = {
     };
 
     const projectForThread = (thread, index) => {
+      // Expanded projects already have one shared project background.
+      if (thread.closest("[data-sidebar-project-kind][data-sidebar-project-container-id], [data-app-action-sidebar-project-row], [data-app-action-sidebar-project-list-id], .group\\/cwd")) return null;
       const nestedProject = thread.closest(PROJECT_SELECTOR);
       const nestedInfo = projectInfo(nestedProject);
       if (nestedInfo) return nestedInfo;
@@ -8703,6 +8735,7 @@ const FEATURES = {
       "data-app-action-sidebar-project-label",
       "data-app-action-sidebar-project-list-id",
       "data-app-action-sidebar-thread-active",
+      "data-app-action-sidebar-thread-selected",
       "data-app-action-sidebar-thread-row",
     ] });
 
@@ -8954,6 +8987,94 @@ function writeFlag(api, id, on) {
     }
   }
 
+  let nativeChoicesPromise = null;
+  let nativeChoicesStopped = false;
+  let nativeChoiceFocus = null;
+  const nativeChoiceRoots = new Map();
+  const loadNativeChoices = () => nativeChoicesPromise ||= (async () => {
+    const url = [...document.querySelectorAll('script[src], link[rel="modulepreload"]')]
+      .map(node => node.src || node.href).find(value => /^app:\/\/[-]\/assets\/app-shared-[\w-]+\.js$/.test(value));
+    if (!url) throw new Error("Codex UI module is unavailable");
+    const source = await fetch(url).then(response => {
+      if (!response.ok) throw new Error("Codex UI module could not be read");
+      return response.text();
+    });
+    const module = await import(url);
+    const React = module[nativeFactoryExport(source, ".createElement=function")]();
+    const ReactDOM = module[nativeFactoryExport(source, ".createRoot=function")]();
+    const values = Object.values(module);
+    const Menu = values.find(value => value && typeof value === "object" && value.RadioGroup && value.RadioItem && value.Section && value.Title);
+    const Dropdown = values.find(value => {
+      if (typeof value !== "function") return false;
+      try { const text = Function.prototype.toString.call(value); return text.includes("triggerButton:") && text.includes("matchTriggerWidth:") && text.includes("onOpenAutoFocus:"); }
+      catch { return false; }
+    });
+    if (!React?.createElement || !ReactDOM?.createRoot || !Dropdown || !Menu) throw new Error("Codex dropdown components are unavailable");
+    return { React, ReactDOM, Dropdown, Menu };
+  })().catch(error => { nativeChoicesPromise = null; throw error; });
+
+  function unmountNativeChoices(container) {
+    for (const [select, record] of nativeChoiceRoots) {
+      if (!container || container.contains(select)) {
+        record.root.unmount();
+        record.host.remove();
+        nativeChoiceRoots.delete(select);
+      }
+    }
+  }
+
+  function mountNativeChoices(container) {
+    for (const select of container.querySelectorAll("select")) {
+      const current = nativeChoiceRoots.get(select);
+      if (current) { current.render(); continue; }
+      if (select.hidden) continue;
+      select.hidden = true;
+      const host = document.createElement("span");
+      host.dataset.buiNativeChoice = "true";
+      host.textContent = "正在加载 Codex 选项…";
+      select.before(host);
+      void loadNativeChoices().then(runtime => {
+        if (nativeChoicesStopped || !host.isConnected || !select.isConnected) return;
+        const fail = error => {
+          rendererApi.log.warn("Native Codex dropdown unavailable", error);
+          queueMicrotask(() => {
+            const record = nativeChoiceRoots.get(select);
+            record?.root.unmount();
+            nativeChoiceRoots.delete(select);
+            if (host.isConnected) { host.textContent = "Codex 选项组件不可用，请重新打开设置"; host.setAttribute("role", "status"); }
+          });
+        };
+        const root = runtime.ReactDOM.createRoot(host, { onUncaughtError: fail });
+        const scope = select.closest("[data-bui-theme-editor], .better-ui-title-model-control");
+        const label = select.getAttribute("aria-label");
+        const focus = {
+          beforeChange() { nativeChoiceFocus = { scope, label }; },
+          onMount(node) {
+            if (node && nativeChoiceFocus?.scope === scope && nativeChoiceFocus.label === label) {
+              nativeChoiceFocus = null;
+              node.focus({ preventScroll: true });
+            }
+          },
+        };
+        const record = { host, root, render: () => root.render(nativeChoiceElement(runtime, select, focus)) };
+        nativeChoiceRoots.set(select, record);
+        record.render();
+      }).catch(error => {
+        rendererApi.log.warn("Native Codex dropdown unavailable", error);
+        if (host.isConnected) { host.textContent = "Codex 选项组件不可用，请重新打开设置"; host.setAttribute("role", "status"); }
+      });
+    }
+  }
+
+  let projectTheme;
+  try { projectTheme = validateProjectTheme(rendererApi.storage.get(PROJECT_THEME_STORAGE_KEY, createProjectTheme())); }
+  catch (error) { rendererApi.log.warn("Invalid saved project theme; using Codex preset", error); projectTheme = createProjectTheme(); }
+  const projectThemeStyle = document.createElement("style");
+  projectThemeStyle.id = PROJECT_THEME_STYLE_ID;
+  document.getElementById(PROJECT_THEME_STYLE_ID)?.remove();
+  document.head.appendChild(projectThemeStyle);
+  const applyProjectTheme = () => { projectThemeStyle.textContent = `:root { ${projectThemeVariables(projectTheme)} }`; };
+  applyProjectTheme();
   tweak.start.call(tweak, rendererApi);
   const features = FEATURE_IDS;
   const featureInfo = FEATURE_DEFINITIONS;
@@ -8995,6 +9116,7 @@ function writeFlag(api, id, on) {
         ensureSettingsStyle();
         refreshSettingsPanel(root);
         return () => {
+          unmountNativeChoices(root);
           delete root.dataset.betterUiImropvementUiSettingsRoot;
           root.innerHTML = "";
         };
@@ -9076,7 +9198,171 @@ function writeFlag(api, id, on) {
     refreshSettingsPanel();
   }
 
+  function bindProjectThemeEditor(panel) {
+    const root = panel.querySelector("[data-bui-theme-editor]");
+    if (!root) return;
+    let draft = structuredClone(projectTheme);
+    let selectedColor = "blue";
+    let editMode = draft.mode === "auto" ? (getComputedStyle(document.documentElement).colorScheme.includes("dark") ? "dark" : "light") : draft.mode;
+    let busy = false;
+    let pending = false;
+    const message = text => {
+      root.querySelector("[data-theme-status]").textContent = text;
+      const dialogStatus = root.querySelector("[data-theme-import-status]");
+      if (root.querySelector("dialog")?.open) dialogStatus.textContent = text;
+    };
+    const markCustom = () => { draft.preset = "custom"; const select = root.querySelector("[data-theme-preset]"); select.value = "custom"; nativeChoiceRoots.get(select)?.render(); };
+    const preview = () => {
+      const node = root.querySelector("[data-theme-preview]");
+      node.style.cssText = `${projectThemeVariables(draft)};color-scheme:${editMode};background:${draft.variants[editMode].surface}`;
+      node.innerHTML = [selectedColor, selectedColor === "purple" ? "blue" : "purple"].map((id, index) => `
+        <div class="bui-theme-preview-project" style="--preview-accent:var(--codexpp-project-${id}-tint);--preview-text:var(--codexpp-project-${id}-text);--preview-bg:var(--codexpp-project-${id}-background);--preview-border:var(--codexpp-project-${id}-border)">
+          <div class="bui-theme-preview-title">${index ? "另一个项目" : "项目示例"}</div>
+          ${index ? "" : '<div class="bui-theme-preview-project-chat">项目内会话</div>'}
+        </div>
+        ${index ? "" : `<div style="--preview-accent:var(--codexpp-project-${id}-tint)"><div class="bui-theme-preview-thread">普通会话</div><div class="bui-theme-preview-thread" data-active>当前会话</div></div>`}`).join("");
+      const badge = root.querySelector("[data-theme-badge]");
+      badge.style.cssText = `background:${draft.variants[editMode].surface};color:${draft.variants[editMode].colors[selectedColor].text}`;
+      root.querySelector("[data-theme-pending]").hidden = !pending;
+      root.querySelector("[data-theme-help]").textContent = `${pending ? "当前修改仅用于预览，应用后保存。" : "修改自动保存。"}当前编辑${editMode === "dark" ? "深色" : "浅色"}的${PROJECT_THEME_COLORS[selectedColor]}，用于选择了此颜色的项目与会话。`;
+    };
+    const row = (label, control) => `<div class="bui-theme-row"><span class="bui-theme-label">${label}</span><div class="bui-theme-control">${control}</div></div>`;
+    const colorInput = (path, value, label) => `<span class="bui-theme-color-pair">
+      <input type="color" value="${value}" data-theme-path="${path}" aria-label="${label}取色器" title="${label}">
+      <input type="text" value="${value}" data-theme-path="${path}" pattern="#[0-9a-fA-F]{6}" maxlength="7" required spellcheck="false" aria-label="${label}十六进制颜色">
+    </span>`;
+    const render = () => {
+      const advancedOpen = root.querySelector("[data-theme-advanced]")?.open;
+      const previewOpen = root.querySelector("[data-theme-preview-details]")?.open;
+      unmountNativeChoices(root);
+      root.innerHTML = `<p class="bui-theme-scope">以下配色仅作用于 Better UI 添加的项目背景、标题 / 图标和会话着色，不修改 Codex 的主题、全局背景、字体或代码配色。</p><fieldset class="bui-theme-fieldset" aria-label="插件项目与会话配色">
+        <div class="bui-theme-card bui-theme-mode-card">${row("配色模式", '<select data-theme-mode aria-label="插件明暗模式"><option value="auto">跟随 Codex</option><option value="light">浅色</option><option value="dark">深色</option></select>')}</div>
+        <div class="bui-theme-card">
+          ${row("配色预设", `<div class="bui-theme-tools"><button type="button" class="bui-theme-quiet" data-theme-action="open-import" aria-haspopup="dialog">导入</button><button type="button" class="bui-theme-quiet" data-theme-action="export">导出</button><span class="bui-theme-preset"><span data-theme-badge aria-hidden="true">Aa</span><select data-theme-preset aria-label="主题预设"><option value="codex">Codex 默认</option><option value="github">GitHub</option><option value="vscode">VS Code</option><option value="custom">自定义</option></select></span></div>`)}
+          ${row("编辑配色", '<select data-theme-edit-mode aria-label="编辑明暗配色"><option value="light">浅色</option><option value="dark">深色</option></select>')}
+          ${row("项目颜色", `<select data-theme-color aria-label="编辑颜色槽位">${Object.entries(PROJECT_THEME_COLORS).map(([id, name]) => `<option value="${id}">${name}</option>`).join("")}</select>`)}
+          ${Object.entries({ accent: "强调色", background: "背景", text: "前景", border: "边框" }).map(([field, label]) => row(label, colorInput(`variants.${editMode}.colors.${selectedColor}.${field}`, draft.variants[editMode].colors[selectedColor][field], `${editMode === "dark" ? "深色" : "浅色"}${label}`))).join("")}
+        </div>
+        <p class="bui-theme-help" data-theme-help></p>
+        <details class="bui-theme-details" data-theme-advanced ${advancedOpen ? "open" : ""}><summary>高级</summary><div class="bui-theme-card">
+          ${row("主题名称", `<input data-theme-name aria-label="主题名称" value="${escapeAttr(draft.name)}" maxlength="60" required>`)}
+          ${row("预览画布底色", colorInput(`variants.${editMode}.surface`, draft.variants[editMode].surface, "预览画布底色"))}
+          ${Object.entries(PROJECT_THEME_STYLE_FIELDS).filter(([key]) => key !== "stripeWidth").map(([key, [label, min, max]]) => row(label, `<input type="number" aria-label="${label}" data-theme-style="${key}" min="${min}" max="${max}" step="1" required value="${draft.styles[key]}">`)).join("")}
+        </div></details>
+        <details class="bui-theme-details" data-theme-preview-details ${previewOpen ? "open" : ""}><summary>预览</summary><div data-theme-preview aria-label="项目主题预览"></div></details>
+        <div class="bui-theme-pending" data-theme-pending ${pending ? "" : "hidden"}><span>当前预览尚未应用</span><div class="bui-theme-actions"><button type="button" data-theme-action="reset">取消修改</button><button type="button" data-theme-action="save">应用主题</button></div></div>
+      </fieldset>
+      <div class="bui-theme-status" data-theme-status role="status" aria-live="polite"></div>
+      <dialog class="bui-theme-import-dialog" aria-label="导入主题">
+        <h3>导入主题</h3><p class="bui-theme-help">选择 Better UI 主题 JSON 文件，或粘贴主题内容。导入后先预览，再应用。</p>
+        <label class="bui-theme-file">选择主题文件<input type="file" accept=".json,application/json" data-theme-file></label>
+        <label class="bui-theme-json-label">主题 JSON<textarea data-theme-json rows="7" maxlength="65536" spellcheck="false" placeholder="粘贴 Better UI 导出的 JSON"></textarea></label>
+        <div data-theme-import-status class="bui-theme-status" role="status"></div>
+        <div class="bui-theme-actions"><button type="button" data-theme-action="close-import">取消</button><button type="button" data-theme-action="import">导入并预览</button></div>
+      </dialog>`;
+      root.querySelector("[data-theme-preset]").value = draft.preset;
+      root.querySelector("[data-theme-color]").value = selectedColor;
+      root.querySelector("[data-theme-mode]").value = draft.mode;
+      root.querySelector("[data-theme-edit-mode]").value = editMode;
+      preview();
+      mountNativeChoices(root);
+    };
+    const validInputs = () => [...root.querySelectorAll("fieldset input")].every(input => input.reportValidity());
+    const save = async () => {
+      if (!validInputs()) return;
+      busy = true;
+      root.querySelector("fieldset").disabled = true;
+      try {
+        const next = validateProjectTheme(draft);
+        await rendererApi.storage.set(PROJECT_THEME_STORAGE_KEY, next);
+        if (!projectThemeStyle.isConnected) return;
+        projectTheme = next;
+        applyProjectTheme();
+        pending = false;
+        preview();
+        message("已保存");
+      } catch (error) {
+        pending = true; preview(); message(`保存失败：${error.message}`);
+      } finally { busy = false; root.querySelector("fieldset").disabled = false; }
+    };
+    const importTheme = text => {
+      if (text.length > 65536) throw new Error("主题文件不能超过 64 KB");
+      const imported = validateProjectTheme(JSON.parse(text));
+      imported.preset = "custom";
+      draft = imported;
+      pending = true;
+      render();
+      root.querySelector("[data-theme-preview-details]").open = true;
+      message("导入成功。检查预览后点击“应用主题”。");
+    };
+    root.addEventListener("input", event => {
+      const input = event.target;
+      if (busy || !input.checkValidity()) return;
+      if (input.matches("[data-theme-name]")) { draft.name = input.value; markCustom(); }
+      else if (input.matches("[data-theme-style]")) { draft.styles[input.dataset.themeStyle] = Number(input.value); markCustom(); }
+      else if (input.matches("[data-theme-path]")) {
+        const path = input.dataset.themePath.split(".");
+        const key = path.pop();
+        path.reduce((value, part) => value[part], draft)[key] = input.value.toLowerCase();
+        for (const peer of root.querySelectorAll("[data-theme-path]")) if (peer !== input && peer.dataset.themePath === input.dataset.themePath) peer.value = input.value;
+        markCustom();
+      } else return;
+      preview();
+    });
+    root.addEventListener("keydown", event => {
+      if (event.key === "Enter" && event.target.matches('input:not([type="file"]):not([type="color"])')) { event.preventDefault(); event.target.blur(); }
+    });
+    root.addEventListener("focusout", event => {
+      if (!busy && !pending && event.target.matches('[data-theme-path][type="text"], [data-theme-style], [data-theme-name]')) void save();
+    });
+    root.addEventListener("change", async event => {
+      const input = event.target;
+      if (busy) return;
+      try {
+        if (input.matches("[data-theme-preset]")) {
+          if (input.value === "custom") draft.preset = "custom";
+          else { const mode = draft.mode; draft = createProjectTheme(input.value); draft.mode = mode; }
+          render(); if (!pending) await save();
+        } else if (input.matches("[data-theme-mode]")) {
+          draft.mode = input.value;
+          editMode = draft.mode === "auto" ? (getComputedStyle(document.documentElement).colorScheme.includes("dark") ? "dark" : "light") : draft.mode;
+          render(); if (!pending) await save();
+        } else if (input.matches("[data-theme-edit-mode]")) { editMode = input.value; render(); }
+        else if (input.matches("[data-theme-color]")) { selectedColor = input.value; render(); }
+        else if (input.matches("[data-theme-file]") && input.files[0]) {
+          if (input.files[0].size > 65536) throw new Error("主题文件不能超过 64 KB");
+          busy = true;
+          root.querySelector("fieldset").disabled = true;
+          const text = await input.files[0].text();
+          if (root.isConnected && projectThemeStyle.isConnected) importTheme(text);
+        } else if (input.matches('[data-theme-path][type="color"]')) { if (!pending) await save(); }
+      } catch (error) { message(`未导入：${error.message}`); }
+      finally { busy = false; root.querySelector("fieldset").disabled = false; }
+    });
+    root.addEventListener("click", async event => {
+      const button = event.target.closest?.("button");
+      if (!button || busy) return;
+      try {
+        const action = button.dataset.themeAction;
+        if (action === "open-import") { root.querySelector("dialog").showModal(); return; }
+        if (action === "close-import") { root.querySelector("dialog").close(); return; }
+        if (action === "reset") { draft = structuredClone(projectTheme); pending = false; render(); message("已取消修改。"); return; }
+        if (action === "import") { importTheme(root.querySelector("[data-theme-json]").value); return; }
+        if (action === "save") { await save(); return; }
+        if (action === "export") {
+          if (!validInputs()) return;
+          const url = URL.createObjectURL(new Blob([JSON.stringify(validateProjectTheme(draft), null, 2) + "\n"], { type: "application/json" }));
+          const link = document.createElement("a"); link.href = url; link.download = "better-ui-theme.json"; link.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+          message("已导出主题。");
+        }
+      } catch (error) { message(`未应用：${error.message}`); }
+    });
+    render();
+  }
+
   function bindSettingsPanel(panel) {
+    bindProjectThemeEditor(panel);
     panel.addEventListener("change", (event) => {
       if (event.target?.matches?.("[data-better-ui-title-model]")) {
         titleModelSettings.select(event.target.value);
@@ -9204,7 +9490,7 @@ function writeFlag(api, id, on) {
       },
       {
         id: "sidebar",
-        title: "侧栏与项目",
+        title: "侧栏与会话着色",
         features: ["sidebar-project-backgrounds", "sidebar-conversation-colors"],
       },
       {
@@ -9252,6 +9538,7 @@ function writeFlag(api, id, on) {
                 </div>
               `).join("")}
             </div>
+            ${group.id === "sidebar" ? '<div data-bui-theme-editor></div>' : ""}
           </section>
         `).join("")}
         <div class="better-ui-imropvement-ui-settings-footer text-xs text-secondary">Better UI Imropvement · ${escapeHtmlLocal(VERSION)}</div>
@@ -9287,6 +9574,7 @@ function writeFlag(api, id, on) {
           !available ? "所选模型当前不可用，请选择其他模型。" : "每次启动重新读取；仅用于压缩后的标题生成。";
       const retry = control.querySelector("[data-better-ui-title-model-retry]");
       retry.hidden = state.status === "loading";
+      mountNativeChoices(control);
     }
   }
 
@@ -9295,6 +9583,64 @@ function writeFlag(api, id, on) {
     const style = document.createElement("style");
     style.id = "better-ui-imropvement-ui-settings-style";
     style.textContent = `
+      [data-bui-theme-editor] { min-width: 0; margin-top: 16px; }
+      .bui-theme-scope { margin: 0 0 12px; color: var(--color-text-secondary, inherit); font-size: 12px; line-height: 1.6; }
+      .bui-theme-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+      .bui-theme-card { background: var(--color-background-panel, var(--color-background-primary-soft-alpha, color-mix(in srgb, currentColor 3%, transparent))); border: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); border-radius: 20px; overflow: hidden; }
+      .bui-theme-mode-card { margin-bottom: 16px; }
+      .bui-theme-row { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 16px; box-sizing: border-box; }
+      .bui-theme-row:not(:last-child)::after { content: ""; position: absolute; inset: auto 16px 0; height: .5px; background: var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); pointer-events: none; }
+      .bui-theme-label { min-width: 0; font-size: 13px; font-weight: 500; line-height: 18px; }
+      .bui-theme-control { display: flex; align-items: center; justify-content: end; gap: 8px; min-width: 0; max-width: 75%; }
+      .bui-theme-tools { display: flex; align-items: center; justify-content: end; gap: 6px; flex-wrap: wrap; }
+      [data-bui-theme-editor] :is(select,input,textarea,button) { font: inherit; color: inherit; box-sizing: border-box; }
+      [data-bui-theme-editor] :is(select,button) { cursor: pointer; }
+      [data-bui-theme-editor] :is(select,input,textarea,button,summary):focus-visible { outline: 2px solid var(--color-focus-ring, var(--color-text-info-surface, #58a6ff)); outline-offset: 2px; }
+      [data-bui-theme-editor] :is(select,button), .bui-theme-row input:not([type=color]) { font-size: 12px; line-height: 16px; }
+      [data-bui-theme-editor] select, .bui-theme-row input:not([type=color]), .bui-theme-actions button { min-height: 28px; max-width: 100%; padding: 4px 10px; border: 1px solid var(--color-border, color-mix(in srgb, currentColor 10%, transparent)); border-radius: 999px; background: var(--color-surface, Canvas); }
+      [data-bui-theme-editor] button { border: 0; padding: 5px 9px; background: transparent; border-radius: 999px; }
+      [data-bui-theme-editor] button:hover { background: var(--color-background-primary-ghost-hover, color-mix(in srgb, currentColor 7%, transparent)); }
+      [data-bui-theme-editor] .bui-theme-quiet { color: var(--color-text-tertiary, inherit); padding-inline: 6px; }
+      .bui-theme-preset { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 1px solid var(--color-border, color-mix(in srgb, currentColor 10%, transparent)); background: var(--color-surface, Canvas); padding-left: 5px; }
+      .bui-theme-preset [data-theme-badge] { display: grid; place-items: center; height: 20px; width: 20px; border-radius: 50%; font-size: 11px; font-weight: 600; }
+      [data-bui-theme-editor] button.bui-native-choice, .better-ui-title-model-control button.bui-native-choice { min-height: 28px; padding: 4px 10px; border: 1px solid var(--color-border, #80808040); border-radius: 999px; background: var(--color-surface, Canvas); color: inherit; font: inherit; font-size: 12px; }
+      [data-bui-theme-editor] .bui-theme-preset button.bui-native-choice { border: 0; width: 143px; text-align: start; }
+      [data-bui-native-choice] { display: inline-flex; min-width: 0; }
+      .better-ui-title-model-control select[hidden] { display: none !important; }
+      [data-bui-theme-editor] .bui-theme-small button { min-height: 22px; padding: 2px 10px; font-size: 11px; }
+      .bui-theme-color-pair { box-sizing: border-box; display: inline-flex; height: 28px; width: 96px; align-items: center; gap: 8px; border-radius: 999px; padding: 0 8px; border: 1px solid var(--color-border, color-mix(in srgb, currentColor 10%, transparent)); }
+      .bui-theme-color-pair:focus-within { outline: 2px solid var(--color-focus-ring, #58a6ff); outline-offset: 1px; }
+      .bui-theme-color-pair input[type=color] { appearance: none; flex: 0 0 14px; width: 14px; height: 14px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: transparent; cursor: pointer; }
+      .bui-theme-color-pair input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+      .bui-theme-color-pair input[type=color]::-webkit-color-swatch { border-radius: 50%; border: 1px solid var(--color-border, transparent); }
+      [data-bui-theme-editor] .bui-theme-color-pair input[type=text] { padding: 0; min-height: 0; min-width: 0; width: 100%; border: 0; border-radius: 0; background: transparent; outline: 0; text-transform: uppercase; font-size: 11px; font-variant-numeric: tabular-nums; }
+      .bui-theme-row input[type=number] { width: 76px; text-align: right; }
+      [data-theme-name] { width: 180px; }
+      .bui-theme-help { font-size: 12px; line-height: 1.6; color: var(--color-text-secondary, inherit); margin: 10px 0 0; }
+      .bui-theme-details { margin-top: 24px; }
+      .bui-theme-details summary { width: fit-content; cursor: pointer; color: var(--color-text-secondary, inherit); font-size: 12px; padding: 4px 0; }
+      .bui-theme-details[open] summary { margin-bottom: 12px; }
+      .bui-theme-status { min-height: 18px; margin-top: 8px; color: var(--color-text-secondary, inherit); font-size: 12px; overflow-wrap: anywhere; }
+      .bui-theme-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; font-size: 12px; }
+      [data-bui-theme-editor] [hidden] { display: none !important; }
+      .bui-theme-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+      [data-bui-theme-editor] .bui-theme-actions button { padding-inline: 14px; }
+      .bui-theme-import-dialog { box-sizing: border-box; width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 40px); padding: 24px; border: 1px solid var(--color-border, #80808040); border-radius: 20px; color: var(--color-text-primary, CanvasText); background: var(--color-background-panel, Canvas); }
+      .bui-theme-import-dialog::backdrop { background: #0006; }
+      .bui-theme-import-dialog h3 { margin: 0; font-size: 18px; font-weight: 600; }
+      .bui-theme-file, .bui-theme-json-label { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; font-size: 12px; }
+      [data-theme-file] { width: 100%; font-size: 12px !important; }
+      [data-theme-json] { width: 100%; resize: vertical; border-radius: 10px; padding: 10px; border: 1px solid var(--color-border, #80808040); background: var(--color-surface, Canvas); font: 12px/1.5 ui-monospace, monospace !important; }
+      [data-theme-preview] { padding: 16px; border: 1px solid var(--color-border, #80808040); border-radius: 16px; max-width: 340px; }
+      .bui-theme-preview-project { border-radius: var(--bui-theme-radius); box-shadow: inset 0 0 0 var(--bui-theme-borderWidth) var(--preview-border); background: var(--preview-bg); padding: 6px; margin-bottom: 8px; }
+      .bui-theme-preview-project:hover { background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-hoverOpacity), var(--preview-bg)); }
+      .bui-theme-preview-title { color: var(--preview-text); padding: 3px 5px 7px; font-size: 13px; }
+      .bui-theme-preview-project-chat { color: light-dark(#24292f, #e6edf3); font-size: 12px; padding: 5px 8px; }
+      .bui-theme-preview-thread { color: light-dark(#24292f, #e6edf3); border-radius: max(8px, var(--bui-theme-radius, 8px)); background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-conversationOpacity), transparent); font-size: 12px; padding: 5px 8px; margin: 2px 0; }
+      .bui-theme-preview-thread:hover { background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-conversationHoverOpacity), transparent); }
+      .bui-theme-preview-thread[data-active] { background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-conversationActiveOpacity), transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--preview-accent) 24%, transparent); }
+      @media (max-width: 520px) { .bui-theme-row { padding-inline: 12px; gap: 8px; } .bui-theme-control { max-width: 78%; } [data-bui-theme-editor] .bui-theme-preset button.bui-native-choice { width: 100px; } }
+
       .better-ui-title-model-control { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
       .better-ui-title-model-control label { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
       .better-ui-title-model-control select {
@@ -9583,7 +9929,11 @@ function writeFlag(api, id, on) {
       if (reload) window.location.reload();
     },
     stop() {
+      nativeChoicesStopped = true;
+      nativeChoiceFocus = null;
+      unmountNativeChoices();
       titleModelSettings.stop();
+      projectThemeStyle.remove();
       for (const timer of lifecycleTimers) window.clearTimeout(timer);
       lifecycleTimers.clear();
       settingsObserver?.disconnect();

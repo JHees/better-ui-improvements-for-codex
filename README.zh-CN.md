@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.4.21-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.22-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.21 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.4.22 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.4.21 新增独立的明暗主题按钮，采用额度控件的悬停样式，并取消额度启动时的临时位置。已在 Windows Codex 26.928.2636.0 中检查侧栏运行行为。详见[版本更新说明](docs/RELEASE-1.4.21.md)。
+1.4.22 新增可编辑项目配色与原生下拉控件，修复云项目颜色框未覆盖下属会话的问题，并将独立会话色条改为淡色圆角背景。详见[版本更新说明](docs/RELEASE-1.4.22.md)。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.21`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.22`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -70,6 +70,15 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 
 所有功能开关都位于 **Codex 设置 → Script-Loader → 界面增强**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.11 恢复了通过 Codex renderer HTTP 服务获取额度，并隐藏了置顶会话行中重复出现的前置会话图标。插件声明的设置页继续复用当前 Codex 设置页的布局、字体、卡片、控件和滚动容器。标题生成继续使用 system 来源的临时工作分支，只接受本次新增且已完成的原生压缩 turn，并只屏蔽精确匹配临时分支的完成通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好会从旧版 Codex++ 存储命名空间迁移到 Script Loader 命名空间。
 
+### 项目配色与主题
+
+在 **界面增强 → 侧栏与会话着色** 中选择 Codex 默认、GitHub 或 VS Code 风格预设；这些预设仅调整 Better UI 添加的项目背景、标题 / 图标和会话着色，不修改 Codex 自身主题、全局背景、字体或代码配色。明暗模式可跟随 Codex，或固定为浅色 / 深色。
+
+- 七个颜色槽位均可分别编辑浅色、深色下的强调色、项目文字 / 图标、项目底色和边框；支持取色器及 `#RRGGBB` 输入。项目右键菜单继续选择槽位，原有项目分配不会被主题覆盖。
+- 样式细节包括圆角、边框宽度，以及项目悬停、普通 / 悬停 / 选中会话的着色强度。预览画布底色仅用于预览。
+- 配色设置位于侧栏着色开关下方；配色与标题模型的下拉选择直接复用当前 Codex 的 Dropdown / RadioGroup / RadioItem 组件，弹层、选中勾号、键盘操作和主题样式由 Codex 提供。取色、数字输入和导入弹窗仍使用浏览器原生控件。选择预设、明暗模式，或修改颜色并离开输入框后自动保存；可切换编辑浅色 / 深色配色。尺寸选项收在 **高级**，效果收在 **预览**。导入从主题行打开弹窗，先预览，再点击 **应用主题**，也可取消修改。
+- **导入 / 导出主题** 支持 Better UI 的完整 JSON 配置（schemaVersion 1，最多 64 KB），可以选择文件或粘贴 JSON。导出包含两个明暗变体与全部样式，适合备份和分享；不直接支持 VS Code 扩展或 Codex 的主题文件。无效导入不会覆盖已保存配置。
+
 项目颜色通过项目自带右键菜单中的 **项目着色** 二级菜单修改。每个颜色选项同时显示文字和颜色样例：“自动”继续按项目名称分配颜色，“无颜色”恢复项目及其会话的 Codex 原生样式。Codex 提供稳定项目 ID 时，手动选择会优先绑定该 ID，并保留项目名称作为兼容回退。插件只向 Codex 的项目菜单数据追加该子菜单，不替换或遮挡原生右键菜单。
 
 会话着色必须取得 Codex 的稳定项目 ID。普通会话中显示的工作目录名称不会再被视为项目归属。
@@ -86,8 +95,8 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 
 ## 会话项目着色
 
-- 普通侧栏、展开的项目列表以及有限筛选结果中的会话，会继承所属项目的颜色。
-- 使用低对比度背景和左侧色条，保持标题、选中状态和未读提示清晰可读。
+- 普通侧栏及有限筛选结果中单独显示的会话，会继承所属项目的颜色；项目内条目共用整个项目的颜色框，不另行着色。
+- 使用淡色圆角背景，悬停时稍加深，选中时增加细边缘提示；不再显示左侧色条，标题和未读提示保持原生样式。
 - 无法确认项目归属的会话保持 Codex 默认样式。
 - 可在 **Codex 设置 → Script-Loader → 界面增强** 中单独开启或关闭；项目颜色设置会自动同步到会话。
 - 修改项目颜色后，当前已显示的会话颜色会立即同步更新。

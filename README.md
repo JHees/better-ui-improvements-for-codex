@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.21-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.22-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.21 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.4.22 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.4.21 adds an independent light/dark theme button with usage-style hover feedback and removes temporary usage placement during startup. Runtime sidebar behavior was checked with Codex 26.928.2636.0 on Windows. See the [release notes](docs/RELEASE-1.4.21.md).
+Version 1.4.22 adds editable project palettes and native dropdown controls, fixes cloud project frames to include their child conversations, and replaces standalone conversation stripes with soft rounded backgrounds. See the [release notes](docs/RELEASE-1.4.22.md).
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.21`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.22`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -70,6 +70,15 @@ Codex++ users may continue using the market's frozen `1.2.4` build, but it is un
 
 Feature switches are available under **Codex Settings → Script-Loader → Interface enhancements**. Preferences are stored locally and survive script reloads. Version 1.4.11 restores quota retrieval through Codex's renderer HTTP service and suppresses the redundant leading chat icon on pinned sidebar rows. The plugin-defined settings page continues to use the current Codex settings layout, typography, cards, controls, and scroll surface. Title regeneration keeps its system-scoped temporary working fork, waits for a newly completed native compaction turn, and suppresses only the matching temporary-thread notification. Markdown tables, links, and layout remain delegated to Codex's native preview, and project-color choices continue to migrate from the legacy Codex++ storage namespace to the Script Loader namespace.
 
+### Project palette and themes
+
+Under **Interface enhancements → Sidebar and conversation colors**, choose a Codex default, GitHub, or VS Code inspired preset. Presets only style Better UI's project backgrounds, titles/icons and conversation coloring; they do not change Codex's theme, global background, fonts or code palette. Follow Codex's light/dark mode or select a fixed mode.
+
+- Edit all seven color slots in both light and dark variants: accent, project text/icon, background, and border, using a color picker or `#RRGGBB`. Existing per-project slot assignments remain intact.
+- Customize corner radius, border width, project hover intensity, and normal/hover/selected conversation tint strength. The preview canvas color only affects the preview.
+- Palette settings are grouped below the sidebar coloring switches. Palette and title-model dropdowns mount Codex’s existing Dropdown / RadioGroup / RadioItem components, which provide the popup, checked state, keyboard navigation and theme styling. Color/number inputs and the import dialog remain native browser controls. Presets and modes save immediately; color/text edits save on leaving the field. Switch between light/dark palettes, expand **Advanced** for geometry, or **Preview** for an example. Import opens a dialog and remains a draft until **Apply theme**; it can also be cancelled.
+- Import a Better UI theme JSON file or paste JSON (schemaVersion 1, at most 64 KB). Export includes both variants and all styles for backup/sharing. VS Code extension and Codex theme files are not directly supported. Invalid imports leave saved settings intact.
+
 Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. Explicit choices are bound to the stable project ID when Codex exposes one, with the project name retained as a compatibility fallback. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
 Conversation colors require Codex's stable project ID. A working-directory name shown in an ordinary chat is not treated as project membership.
@@ -86,8 +95,8 @@ Conversation colors require Codex's stable project ID. A working-directory name 
 
 ## Conversation project colors
 
-- Conversation rows inherit the color of their project in the normal sidebar, expanded project lists, and limited-filter results.
-- The display uses a subtle background and a colored leading edge so titles, selected rows, and unread indicators remain easy to read.
+- Standalone conversation rows inherit their project's color in the normal sidebar and limited-filter results. Rows inside a project share its enclosing color frame without individual coloring.
+- The display uses a soft rounded background, a stronger hover tint, and a thin inset outline for the selected row. There is no leading stripe; titles and unread indicators retain their native styling.
 - Conversations without a known project keep Codex's default appearance.
 - Turn the feature on or off from **Codex Settings → Script-Loader → Interface enhancements**. Project color choices continue to apply automatically.
 - Changing a project color updates currently visible conversation rows immediately.
