@@ -2,6 +2,13 @@
 
 本次更新改善侧栏项目与会话的配色：云项目颜色框完整覆盖下属会话，独立会话采用淡色圆角背景，并提供可编辑的项目主题与原生下拉选择。
 
+## 2026-10-03 同版本修复重发
+
+- 修复最近 / 置顶等列表中单独显示的云项目会话未着色：识别云会话的原生项目 ID，沿用所属项目的配色；项目内条目继续共用项目颜色框，无归属会话保持默认样式。
+- 安装 ZIP 与 SHA-256 文件已重新生成，版本仍为 **1.4.22**。已有 1.4.22 的安装不会因版本号相同而自动升级；请下载本页最新 ZIP 并通过 Loader 安装以替换旧包。已经热加载本次修复的候选无需重复安装。
+- 本次安装包源码对应修复提交 [3cdb0f9](https://github.com/JHees/better-ui-improvements-for-codex/commit/3cdb0f994eaecbbac88978d8a2f45392bed62d0f)。`v1.4.22` 标签及 GitHub 自动生成的 Source code 归档仍对应首次发布源码；使用下方插件 ZIP 获取修复。
+- 静态检查、**47 项测试**及独立包校验通过。Windows Codex 26.930.3930.0 热加载验证确认最近列表中两个云项目会话已继承项目蓝色，17 个无归属云会话未被误着色，项目内条目没有叠加独立着色；没有新增运行错误或重复样式。置顶归属使用同一识别逻辑并有回归覆盖，本次未实际调整置顶状态。
+
 ## 新增与改进
 
 - 在 **界面增强 → 侧栏与会话着色** 中选择 Codex 默认、GitHub 或 VS Code 风格预设，独立编辑七个颜色槽位的浅色 / 深色配色，调整圆角、边框及普通 / 悬停 / 选中状态的着色强度。
@@ -30,6 +37,13 @@
 
 This update improves sidebar colors: cloud project frames now enclose their child conversations, standalone conversations use soft rounded backgrounds, and project palettes can be edited with native dropdown controls.
 
+### Same-version hotfix reissue — 2026-10-03
+
+- Fix standalone cloud project conversations missing their project color in recent/pinned lists by reading their native project ID. Project children continue to share the enclosing frame, and unassigned conversations retain their default appearance.
+- The plugin ZIP and SHA-256 have been rebuilt with version **1.4.22** unchanged. Existing 1.4.22 installations do not receive a version-based automatic update; download the current ZIP from this page and install it through Loader to replace the earlier package. Candidates already hot-loaded with this fix need no further installation.
+- Package source corresponds to fix commit [3cdb0f9](https://github.com/JHees/better-ui-improvements-for-codex/commit/3cdb0f994eaecbbac88978d8a2f45392bed62d0f). The `v1.4.22` tag and GitHub's generated Source code archives still point to the initial release; use the plugin ZIP below for the fix.
+- Syntax checks, **47 tests** and standalone package validation pass. Hot-loading in Codex 26.930.3930.0 on Windows confirmed two recent cloud conversations share the project's blue palette, 17 unassigned cloud conversations remain uncolored, and project children receive no additional conversation tint. No new runtime errors or duplicate styles were observed. Pinned membership uses the same resolution path with regression coverage; pin state was not changed during this validation.
+
 ### Added and improved
 
 - Choose Codex, GitHub or VS Code inspired presets under **Interface enhancements → Sidebar and conversation colors**. Edit seven color slots separately for light and dark appearance, plus corner radius, border width and normal/hover/selected tint strength.
@@ -53,3 +67,5 @@ The release source passes syntax checks, 46 tests and standalone package validat
 Native dropdowns depend on Codex's internal component contracts and may require adaptation after future Codex updates.
 
 **Full Changelog:** [v1.4.21...v1.4.22](https://github.com/JHees/better-ui-improvements-for-codex/compare/v1.4.21...v1.4.22)
+
+**Hotfix diff / 同版本修复差异:** [v1.4.22...3cdb0f9](https://github.com/JHees/better-ui-improvements-for-codex/compare/v1.4.22...3cdb0f994eaecbbac88978d8a2f45392bed62d0f)
