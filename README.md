@@ -81,7 +81,7 @@ Under **Interface enhancements → Sidebar and conversation colors**, choose a C
 
 Change a project color from the **Project color** submenu in the project's built-in context menu. Every option includes both a label and a color swatch: **Auto** keeps name-based color assignment, while **No color** restores Codex's native styling for the project and its conversations. Explicit choices are bound to the stable project ID when Codex exposes one, with the project name retained as a compatibility fallback. The plugin appends only this submenu to Codex's project-menu data; it does not replace or cover the native context menu.
 
-Conversation colors require Codex's stable project ID. A working-directory name shown in an ordinary chat is not treated as project membership.
+Conversation colors use Codex's stable project ID for both local and cloud conversations, including cloud conversations shown separately in recent or pinned lists. A working-directory name shown in an ordinary chat is not treated as project membership.
 
 ## Native thread context actions
 

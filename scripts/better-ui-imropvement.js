@@ -8436,7 +8436,7 @@ const FEATURES = {
       "aside.pointer-events-auto.relative.flex.overflow-visible",
       "aside.pointer-events-auto.relative.flex",
     ].join(", ");
-    const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row]";
+    const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row], [role='button']:has([data-thread-title='true'])";
     const PROJECT_SELECTOR = "[data-app-action-sidebar-project-row]";
     const PROJECT_LIST_SELECTOR = "[data-app-action-sidebar-project-list-id]";
     const PROJECT_ID_ATTRS = [
@@ -8583,14 +8583,17 @@ const FEATURES = {
       let fiber = fiberKey ? thread[fiberKey] : null;
       const visited = new Set();
 
-      // Priority and recent views no longer expose project attributes in the
-      // DOM, but assigned threads still carry a stable project id in their
-      // native hover-card props. A label without an id is only the basename of
-      // the thread's working directory and must not be treated as membership.
+      // Local rows expose hover-card project ids; cloud conversation rows
+      // expose conversationId/projectId instead. Labels alone can be working
+      // directory basenames and must not be treated as membership.
       for (let depth = 0; fiber && depth < 12 && !visited.has(fiber); depth += 1) {
         visited.add(fiber);
         for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
           if (!props || typeof props !== "object") continue;
+          if (typeof props.conversationId === "string" && "projectId" in props) {
+            const id = typeof props.projectId === "string" ? props.projectId.trim() : "";
+            return id ? { id, label: "", key: `id:${normalize(id)}` } : false;
+          }
           if (props.isProjectlessHoverCard === true) return false;
           const id = typeof props.hoverCardProjectId === "string"
             ? props.hoverCardProjectId.trim()
@@ -8634,7 +8637,7 @@ const FEATURES = {
 
       const reactInfo = reactProjectInfo(thread);
       if (reactInfo === false) return null;
-      if (reactInfo) return reactInfo;
+      if (reactInfo) return index.byId.get(normalize(reactInfo.id)) || reactInfo;
 
       // Newer Codex builds render the project as a folder-marked secondary
       // title inside each thread row instead of exposing project row nodes.
@@ -8737,6 +8740,7 @@ const FEATURES = {
       "data-app-action-sidebar-thread-active",
       "data-app-action-sidebar-thread-selected",
       "data-app-action-sidebar-thread-row",
+      "data-thread-title",
     ] });
 
     return () => {

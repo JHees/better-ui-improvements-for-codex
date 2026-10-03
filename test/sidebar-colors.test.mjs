@@ -114,3 +114,31 @@ test("the project frame encloses its sibling chat list without individual chat c
   assert.equal(run.candidateRows(legacyGroup)[0], legacyGroup);
   assert.equal(run.projectForThread(legacy, index), null);
 });
+
+test("standalone cloud conversations resolve their native project id and share the project palette", () => {
+  const body = source.slice(source.indexOf('  "sidebar-conversation-colors"(api) {'));
+  const functions = ["reactProjectInfo", "projectForThread"].map(name =>
+    body.match(new RegExp(`    const ${name} = \\([\\s\\S]*?\\n    \\};`, "u"))[0],
+  ).join("\n");
+  const project = {id: "g-p-cloud", label: "Cloud project", key: "id:g-p-cloud"};
+  const index = {byId: new Map([[project.id, project]]), byList: new Map()};
+  const resolve = vm.runInNewContext(`${functions}\nprojectForThread`, {
+    PROJECT_SELECTOR: "project", PROJECT_LIST_SELECTOR: "list", PROJECT_ID_ATTRS: [], PROJECT_LABEL_ATTRS: [],
+    normalize: value => String(value || "").trim().toLowerCase(), attrValue: () => "", projectInfo: () => null,
+    secondaryProjectInfo: () => ({id: "", label: "Misleading directory name"}),
+  });
+  const thread = props => {
+    let fiber = {memoizedProps: props};
+    for (let depth = 0; depth < 9; depth += 1) fiber = {memoizedProps: {}, return: fiber};
+    return {__reactFiber$fixture: fiber, closest: () => null};
+  };
+  assert.equal(resolve(thread({conversationId: "cloud-chat", projectId: project.id}), index), project);
+  assert.equal(resolve(thread({conversationId: "cloud-chat", projectId: null}), index), null);
+  assert.equal(resolve(thread({conversationId: "cloud-chat", projectId: " "}), index), null);
+  const unavailable = resolve(thread({conversationId: "cloud-chat", projectId: "g-p-collapsed"}), index);
+  assert.equal(unavailable.id, "g-p-collapsed");
+  const local = resolve(thread({hoverCardProjectId: "local-project", hoverCardProjectLabel: "Local"}), index);
+  assert.equal(local.id, "local-project");
+  assert.equal(local.label, "Local");
+  assert.equal(resolve(thread({isProjectlessHoverCard: true, hoverCardProjectLabel: "Local"}), index), null);
+});
