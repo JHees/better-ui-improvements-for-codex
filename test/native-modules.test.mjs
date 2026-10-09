@@ -3,6 +3,58 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 const source = await readFile(new URL('../scripts/better-ui-imropvement.js', import.meta.url), 'utf8');
+
+test('native client discovery accepts connected and deferred RPC resolvers across Codex updates', () => {
+  const functions = source.slice(source.indexOf('  function resolverFromModule('), source.indexOf('  async function loadAppInitialModules('));
+  const find = vm.runInNewContext(`${functions}\nresolverFromModule`);
+  function legacy(scope, hostId) {
+    const manager = scope.get('manager');
+    if (!manager) throw new Error('AppServerManager RPC is not connected');
+    return manager.forHost(hostId);
+  }
+  function deferred(scope, hostId) {
+    const manager = scope.get('manager');
+    if (!manager) throw new Error(`AppServerManager RPC is unavailable for hostId: ${hostId}`);
+    return manager.forHost(hostId);
+  }
+  const unrelated = () => 'AppServerManager RPC is unavailable';
+  const client = { sendRequest() {} };
+  const scope = { get: () => ({ forHost: hostId => { assert.equal(hostId, 'local'); return client; } }) };
+  for (const resolver of [legacy, deferred]) {
+    assert.equal(find({ unrelated, renamed: resolver }), resolver);
+    assert.equal(find({ renamed: resolver })(scope, 'local'), client);
+  }
+  assert.equal(find({ unrelated, other: () => null }), null);
+});
+
+test('new sidebar rows use their bound native conversation ID after persistence', () => {
+  const id = '01234567-89ab-cdef-0123-456789abcdef';
+  const key = `local:client-new-thread:${id}`;
+  class Row {
+    constructor() { this.attrs = { 'data-app-action-sidebar-thread-host-id': 'local', 'data-app-action-sidebar-thread-kind': 'local', 'data-app-action-sidebar-thread-id': key }; }
+    getAttribute(name) { return this.attrs[name] ?? null; }
+  }
+  const row = new Row();
+  const props = { hostId: 'local', conversationId: id, dataAttributes: { 'data-app-action-sidebar-thread-id': key } };
+  row.fiber = { memoizedProps: props, return: null };
+  const constants = source.slice(source.indexOf('  const LOCAL_THREAD_ID_PATTERN ='), source.indexOf('  const LEGACY_MENU_SOURCE_MARKERS ='));
+  const functions = source.slice(source.indexOf('  function localThreadIdFromKey('), source.indexOf('  function threadMenuRefFor('));
+  const find = vm.runInNewContext(`${constants}\n${functions}\nthreadContextFor`, { HTMLElement: Row, reactFiberFor: node => node.fiber });
+  assert.equal(find(row)?.threadId, id);
+  assert.equal(find(row)?.threadKey, `local:${id}`);
+  // A temporary UI UUID is not an App Server thread ID without the native mapping.
+  for (const overrides of [{ conversationId: undefined }, { hostId: 'remote' }, { dataAttributes: {} }, { isEphemeral: true }, { isAeonThread: true }]) {
+    row.fiber.memoizedProps = { ...props, ...overrides };
+    assert.equal(find(row), null);
+  }
+  row.fiber.memoizedProps = props;
+  row.attrs['data-app-action-sidebar-thread-host-id'] = 'remote';
+  assert.equal(find(row), null);
+  row.attrs['data-app-action-sidebar-thread-host-id'] = 'local';
+  row.attrs['data-app-action-sidebar-thread-id'] = `local:${id}`;
+  row.fiber = null;
+  assert.equal(find(row)?.threadId, id);
+});
 test('native service discovery follows both initial and shared entry modules', async () => {
   const script = {src:'app://-/assets/index-new.js'};
   const functions = source.slice(source.indexOf('  function localModuleUrl('), source.indexOf('  function resolverFromModule('));

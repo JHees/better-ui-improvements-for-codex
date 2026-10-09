@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.22";
+  const VERSION = "1.4.23";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -898,7 +898,7 @@ function createSessionThreadActionsManager() {
     const hostId = row.getAttribute("data-app-action-sidebar-thread-host-id") || "";
     const kind = row.getAttribute("data-app-action-sidebar-thread-kind") || "";
     const threadKey = row.getAttribute("data-app-action-sidebar-thread-id") || "";
-    const threadId = localThreadIdFromKey(threadKey);
+    let threadId = localThreadIdFromKey(threadKey);
     const title = row.getAttribute("data-app-action-sidebar-thread-title") ||
       row.getAttribute("aria-label") || "Untitled chat";
     let ephemeral = /^(?:true|1)$/i.test(
@@ -907,6 +907,12 @@ function createSessionThreadActionsManager() {
     for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 18; depth += 1, fiber = fiber.return) {
       for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
         if (props?.isAeonThread === true || props?.isEphemeral === true) ephemeral = true;
+        // Persisted chats can retain their optimistic sidebar key until remount.
+        if (!threadId && threadKey.startsWith("local:client-new-thread:") &&
+            props?.hostId === hostId &&
+            props?.dataAttributes?.["data-app-action-sidebar-thread-id"] === threadKey) {
+          threadId = localThreadIdFromKey(props.conversationId);
+        }
       }
     }
     if (hostId !== "local" || kind !== "local" || !threadId || ephemeral) return null;
@@ -914,7 +920,7 @@ function createSessionThreadActionsManager() {
       row,
       hostId,
       kind,
-      threadKey,
+      threadKey: `local:${threadId}`,
       threadId,
       title: String(title).trim() || "Untitled chat",
     };
@@ -1144,7 +1150,7 @@ function createSessionThreadActionsManager() {
       if (typeof value !== "function") continue;
       try {
         const source = Function.prototype.toString.call(value);
-        if (source.includes("AppServerManager RPC is not connected") && source.includes(".forHost(")) {
+        if (source.includes("AppServerManager RPC") && source.includes(".forHost(")) {
           return value;
         }
       } catch {}
