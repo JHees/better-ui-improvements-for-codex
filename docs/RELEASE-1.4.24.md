@@ -1,39 +1,51 @@
 # Better UI Imropvement 1.4.24
 
-本次更新将会话永久删除改为使用 Codex 原生确认窗口，删除请求、进度和错误提示由原生功能处理。
+2026-10-12 同版本修复重发：确认永久删除后立即关闭原生弹窗，在后台显示删除进度，让 Codex 在等待期间保持可操作。
 
-## 改进
+## 修复与改进
 
-- 插件补充的“永久删除”入口等待右键菜单关闭后，再打开 Codex 原生确认窗口；移除插件自制弹窗及删除前的额外会话读取。
-- 菜单已有原生删除项时直接保留，不再重复添加。原生确认窗口不可用时提示错误，不执行删除。
-- 保留原生取消操作、默认安全焦点和删除失败后的重试行为。确认删除会同时删除子代理会话，且无法撤销。
+- 使用 Codex 原生确认窗口和 `thread/delete` 接口，保留原生警告、取消操作和默认安全焦点。
+- 确认后关闭弹窗，再在后台等待删除完成；收到成功响应后才提示成功，失败时显示错误。
+- 阻止重复确认发送第二次删除请求。已有原生删除菜单项使用相同流程，不重复添加入口。
+- 原生确认窗口不可用时提示错误，不执行删除。确认删除包含子代理会话，且无法撤销。
 
-## 升级与兼容性
+## 安装与源码
 
-通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.24.zip`，并使用配套 `.zip.sha256` 校验。无需修改 Loader，无新增权限或依赖；已有设置保留。Codex++ 支持仍止于 1.2.4。
+下载本页的 `better-ui-imropvement-1.4.24.zip`，使用配套 `.zip.sha256` 校验，并通过 Codex Script Loader 安装。已安装早期 1.4.24 的用户应重新安装这个同版本 ZIP；按版本号比较的自动更新可能不会提示。无需卸载，无新增权限或依赖，已有设置保留。Codex++ 支持仍止于 1.2.4。
 
-候选已在 Windows Codex 26.1007.2314.0 中热加载，验证了单一删除入口、原生确认窗口、默认焦点位于取消按钮以及取消后保留会话。Loader 注入失败数为 0，没有新增相关错误或重复插件节点。
+修复源码：[fcd0f39](https://github.com/JHees/better-ui-improvements-for-codex/commit/fcd0f3907da3713dcdad1b5931c99b5698c614a5)。`v1.4.24` 标签及 GitHub 自动生成的 Source code 归档仍对应首次发布源码；本页插件 ZIP 已包含此次修复。重建修复包时应使用上述修复提交。
 
-正式发布内容通过静态检查、52 项测试和独立安装包校验。没有对实际会话执行永久删除端到端验证；此前故障的具体触发条件尚未重现。原生组件属于 Codex 内部接口，未来应用更新后仍可能需要适配。
+## 验证与限制
+
+- 发布源码通过静态检查、54 项测试及独立安装包校验；回归覆盖慢请求、错误返回、重复确认和取消路径。
+- Windows Codex 26.1007.2314.0 中完成实际删除测试：确认后约 92 毫秒弹窗已关闭，此时请求仍在进行且进度可见；该次请求约 0.88 秒后完成，会话从侧栏移除。
+- 诊断期间创建的六个专用测试会话均已清理，复核主记录、历史记录和会话文件均不存在。热加载后无新增相关错误或重复插件节点。
+- 本次修复解除删除等待期间的界面锁定。原生服务端的慢删除根因尚未定位，不承诺缩短后台清理时间；原生内部接口在应用更新后仍可能需要适配。
 
 ---
 
 ## English
 
-Permanent deletion now uses Codex's native confirmation dialog. Codex handles the deletion request, progress and error feedback.
+Same-version hotfix reissue on 2026-10-12: the native confirmation dialog closes immediately after confirmation, while deletion continues with a progress notification so Codex remains usable.
 
-### Improved
+### Fixed and improved
 
-- The plugin's delete action waits for the context menu to close before opening the native confirmation dialog. The custom dialog and extra pre-deletion thread read have been removed.
-- Existing native delete menu items are preserved without adding duplicates. If the native dialog is unavailable, the plugin reports an error without deleting anything.
-- Native cancellation, safe default focus and retry behavior remain available. Confirmed deletion also deletes subagent tasks and cannot be undone.
+- Reuses Codex's native confirmation dialog and `thread/delete` API, preserving the warning, cancellation and safe default focus.
+- Closes the dialog after confirmation and waits for deletion in the background. Success is reported only after a successful response; failures show an error.
+- Prevents duplicate confirmation from sending a second deletion request. Existing native delete menu items use the same flow without adding duplicates.
+- If the native dialog is unavailable, the plugin reports an error without deleting anything. Confirmed deletion includes subagent tasks and cannot be undone.
 
-### Upgrading and compatibility
+### Installation and source
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.24.zip` and verify its matching `.zip.sha256`. No Loader changes, new permissions or dependencies are required. Existing settings are preserved. Codex++ support remains frozen at 1.2.4.
+Download `better-ui-imropvement-1.4.24.zip` from this release, verify its matching `.zip.sha256`, and install it through Codex Script Loader. Users with the earlier 1.4.24 package should reinstall this same-version ZIP; version-based automatic updates may not offer it. No uninstall, new permissions or dependencies are required, and existing settings are preserved. Codex++ support remains frozen at 1.2.4.
 
-The candidate was hot-loaded in Windows Codex 26.1007.2314.0. Validation confirmed a single delete entry, the native confirmation dialog, default focus on Cancel, and preservation of the conversation after cancellation. Loader reported zero injection failures, with no new related errors or duplicate plugin nodes.
+Hotfix source: [fcd0f39](https://github.com/JHees/better-ui-improvements-for-codex/commit/fcd0f3907da3713dcdad1b5931c99b5698c614a5). The `v1.4.24` tag and GitHub-generated Source code archives still point to the initial release. The plugin ZIP on this page contains the hotfix. Use the linked hotfix commit when rebuilding it.
 
-The release content passes syntax checks, 52 tests and standalone package validation. Permanent deletion was not exercised end to end on a real conversation, and the original failure's precise trigger has not been reproduced. These native components are internal Codex interfaces and may require adaptation after future updates.
+### Validation and limitations
 
-**Full Changelog:** [v1.4.23...v1.4.24](https://github.com/JHees/better-ui-improvements-for-codex/compare/v1.4.23...v1.4.24)
+- The release source passes syntax checks, 54 tests and standalone package validation. Regression coverage includes pending requests, failures, duplicate confirmation and cancellation.
+- Real deletion was exercised in Windows Codex 26.1007.2314.0: the dialog was closed after about 92 ms while the request was still pending and progress remained visible. That request completed after about 0.88 seconds, removing the conversation from the sidebar.
+- All six disposable diagnostic conversations were removed. Follow-up checks found no remaining main records, history records or conversation files. Hot-loading produced no new related errors or duplicate plugin nodes.
+- This fixes the interface lock during deletion. The cause of slow deletion inside the native server remains unresolved; this release does not promise faster backend cleanup. Internal Codex interfaces may require adaptation after application updates.
+
+**Full Changelog:** [v1.4.23...fcd0f39](https://github.com/JHees/better-ui-improvements-for-codex/compare/v1.4.23...fcd0f3907da3713dcdad1b5931c99b5698c614a5)
