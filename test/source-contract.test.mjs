@@ -13,7 +13,7 @@ const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workfl
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.4.23");
+  assert.equal(manifest.version, "1.4.24");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -149,7 +149,7 @@ test("settings root attribute scopes the switch styles", () => {
 
 test("permanent delete follows the system danger styling contract", () => {
   const deleteItem = source.match(
-    /id:\s*DELETE_ITEM_ID,[\s\S]{0,500}?onSelect:\s*\(\) => void deleteThreadPermanently\(context\)/u,
+    /id:\s*DELETE_ITEM_ID,[\s\S]{0,500}?onSelect:\s*\(\) => void openNativeDeleteDialog\(context\)/u,
   );
   assert.ok(deleteItem, "the permanent-delete menu item should exist");
   assert.doesNotMatch(

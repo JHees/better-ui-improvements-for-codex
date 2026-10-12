@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.23";
+  const VERSION = "1.4.24";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -103,7 +103,7 @@
     {
       id: "thread-permanent-delete",
       title: "会话永久删除",
-      detail: "在 Codex 原生会话右键菜单底部增加永久删除；确认后不可恢复。",
+      detail: "通过 Codex 原生确认窗口永久删除会话；已有原生菜单项时直接使用。",
       defaultEnabled: true,
       status: "本地普通会话可用；不提供撤销或 Codex++ 备份",
     },
@@ -494,7 +494,6 @@ function createSessionThreadActionsManager() {
   const THREAD_SELECTOR = "[data-app-action-sidebar-thread-row]";
   const STYLE_ID = "better-ui-imropvement-thread-context-actions-style";
   const TOAST_ID = "better-ui-imropvement-thread-context-actions-toasts";
-  const DIALOG_ATTR = "data-better-ui-imropvement-thread-delete-dialog";
   const REGENERATE_ITEM_ID = "better-ui-imropvement-thread-regenerate-title";
   const EXPORT_ITEM_ID = "better-ui-imropvement-thread-export-markdown";
   const DELETE_SEPARATOR_ID = "better-ui-imropvement-thread-danger-separator";
@@ -554,10 +553,6 @@ function createSessionThreadActionsManager() {
         regenerateTitle: "重新生成标题",
         export: "导出 Markdown",
         delete: "永久删除",
-        deleteTitle: "永久删除会话？",
-        deleteBody: "此操作会永久删除“{title}”及其本地数据，且无法撤销。",
-        cancel: "取消",
-        confirmDelete: "永久删除",
         compactingTitle: "压缩中 · {title}",
         generatingTitle: "生成标题 · {title}",
         temporaryTitle: "正在生成标题（{title}）",
@@ -571,19 +566,12 @@ function createSessionThreadActionsManager() {
         busyThread: "请等待会话完成后再重新生成标题",
         exporting: "正在导出会话…",
         exported: "Markdown 已导出",
-        deleting: "正在永久删除会话…",
-        deleted: "会话已永久删除",
-        staleDelete: "删除请求已完成；如果侧栏仍显示该会话，请稍后刷新 Codex。",
         unavailable: "Codex 原生会话接口暂不可用",
       }
     : {
         regenerateTitle: "Regenerate title",
         export: "Export Markdown",
         delete: "Delete permanently",
-        deleteTitle: "Delete this chat permanently?",
-        deleteBody: "This permanently deletes “{title}” and its local data. This cannot be undone.",
-        cancel: "Cancel",
-        confirmDelete: "Delete permanently",
         compactingTitle: "Compacting · {title}",
         generatingTitle: "Generating title · {title}",
         temporaryTitle: "Generating title ({title})",
@@ -597,9 +585,6 @@ function createSessionThreadActionsManager() {
         busyThread: "Wait for the chat to finish before regenerating its title",
         exporting: "Exporting chat…",
         exported: "Markdown exported",
-        deleting: "Deleting chat permanently…",
-        deleted: "Chat deleted permanently",
-        staleDelete: "The delete request completed. Refresh Codex later if the chat remains in the sidebar.",
         unavailable: "The native Codex chat service is unavailable",
       };
 
@@ -679,77 +664,6 @@ function createSessionThreadActionsManager() {
         border-color: color-mix(in srgb, var(--red-400, #fa423e) 55%, transparent);
       }
 
-      [${DIALOG_ATTR}] {
-        position: fixed;
-        z-index: 2147483647;
-        inset: 0;
-        display: grid;
-        box-sizing: border-box;
-        width: 100vw;
-        max-width: none;
-        height: 100vh;
-        max-height: none;
-        margin: 0;
-        border: 0;
-        place-items: center;
-        background: rgba(0, 0, 0, 0.56);
-        padding: 20px;
-      }
-
-      [${DIALOG_ATTR}]::backdrop {
-        background: transparent;
-      }
-
-      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-card {
-        box-sizing: border-box;
-        width: min(440px, 100%);
-        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-        border-radius: 14px;
-        background: var(--color-token-bg-primary, #202020);
-        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
-        color: var(--color-token-text-primary, #f4f4f4);
-        padding: 20px;
-      }
-
-      [${DIALOG_ATTR}] h2 {
-        margin: 0 0 8px;
-        font-size: 18px;
-        line-height: 1.35;
-      }
-
-      [${DIALOG_ATTR}] p {
-        margin: 0;
-        color: var(--color-token-text-secondary, #b4b4b4);
-        font-size: 13px;
-        line-height: 1.55;
-      }
-
-      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 20px;
-      }
-
-      [${DIALOG_ATTR}] button {
-        min-height: 34px;
-        border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-        border-radius: 8px;
-        background: color-mix(in srgb, currentColor 8%, transparent);
-        color: inherit;
-        cursor: pointer;
-        padding: 6px 12px;
-      }
-
-      [${DIALOG_ATTR}] button:hover {
-        background: color-mix(in srgb, currentColor 13%, transparent);
-      }
-
-      [${DIALOG_ATTR}] .better-ui-imropvement-thread-delete-confirm {
-        border-color: var(--red-400, #fa423e);
-        background: var(--red-400, #fa423e);
-        color: white;
-      }
     `;
     document.head.appendChild(style);
   }
@@ -998,7 +912,7 @@ function createSessionThreadActionsManager() {
       next.splice(insertAt, 0, exportItem);
     }
 
-    if (enabledActions.has(SESSION_ACTION_DELETE)) {
+    if (enabledActions.has(SESSION_ACTION_DELETE) && !next.some((item) => item?.id === "delete-thread")) {
       if (next.length && next[next.length - 1]?.type !== "separator") {
         next.push({ id: DELETE_SEPARATOR_ID, type: "separator" });
       }
@@ -1009,7 +923,8 @@ function createSessionThreadActionsManager() {
         destructive: true,
         danger: true,
         tone: "danger",
-        onSelect: () => void deleteThreadPermanently(context),
+        selectAfterClose: true,
+        onSelect: () => void openNativeDeleteDialog(context),
       });
     }
     return next;
@@ -1958,89 +1873,52 @@ function createSessionThreadActionsManager() {
     }
   }
 
-  function confirmPermanentDelete(context) {
-    document.querySelector(`[${DIALOG_ATTR}]`)?.remove();
-    const text = labels();
-    const overlay = document.createElement("dialog");
-    overlay.setAttribute(DIALOG_ATTR, "true");
-    overlay.innerHTML = `
-      <div class="better-ui-imropvement-thread-delete-card" role="dialog" aria-modal="true" aria-labelledby="better-ui-imropvement-thread-delete-title">
-        <h2 id="better-ui-imropvement-thread-delete-title"></h2>
-        <p></p>
-        <div class="better-ui-imropvement-thread-delete-actions">
-          <button type="button" data-better-ui-imropvement-delete-cancel="true"></button>
-          <button type="button" class="better-ui-imropvement-thread-delete-confirm" data-better-ui-imropvement-delete-confirm="true"></button>
-        </div>
-      </div>
-    `;
-    overlay.querySelector("h2").textContent = text.deleteTitle;
-    overlay.querySelector("p").textContent = text.deleteBody.replace("{title}", context.title);
-    const cancel = overlay.querySelector("[data-better-ui-imropvement-delete-cancel]");
-    const confirm = overlay.querySelector("[data-better-ui-imropvement-delete-confirm]");
-    cancel.textContent = text.cancel;
-    confirm.textContent = text.confirmDelete;
-    const previousFocus = document.activeElement;
-    document.body.appendChild(overlay);
-    if (typeof overlay.showModal === "function") overlay.showModal();
-    else overlay.setAttribute("open", "");
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (value) => {
-        if (settled) return;
-        settled = true;
-        window.removeEventListener("keydown", onKeyDown, true);
-        window.removeEventListener("keyup", onKeyDown, true);
-        overlay.remove();
-        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
-        resolve(value);
-      };
-      const onKeyDown = (event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        finish(false);
-      };
-      cancel.addEventListener("click", () => finish(false));
-      confirm.addEventListener("click", () => finish(true));
-      overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) finish(false);
-      });
-      overlay.addEventListener("cancel", (event) => {
-        event.preventDefault();
-        finish(false);
-      });
-      // Listen on window so Codex's document-level shortcuts cannot consume
-      // Escape before the irreversible-action dialog sees it.
-      window.addEventListener("keydown", onKeyDown, true);
-      window.addEventListener("keyup", onKeyDown, true);
-      window.queueMicrotask(() => cancel.focus());
-    });
+  function nativeDeleteRuntimeFromModules(modules) {
+    let openModal = null;
+    let dialogPath = "";
+    for (const mod of modules) {
+      for (const value of Object.values(mod)) {
+        if (typeof value !== "function") continue;
+        let source = "";
+        try { source = Function.prototype.toString.call(value); } catch { continue; }
+        if (source.includes(".modals.find(") && source.includes("ModalComponent:") &&
+            source.includes("blocksOtherModals:")) openModal = value;
+        if (source.includes("delete-thread") && source.includes("DeleteThreadDialog")) {
+          dialogPath ||= source.match(/import\(["'`](\.\/delete-thread-dialog-[A-Za-z0-9_-]+\.js)["'`]\)/)?.[1] || "";
+        }
+      }
+    }
+    return openModal && dialogPath ? { openModal, dialogPath } : null;
   }
 
-  async function deleteThreadPermanently(context) {
+  async function loadNativeDeleteRuntime() {
+    const runtime = nativeDeleteRuntimeFromModules(await loadAppInitialModules());
+    if (!runtime) throw new Error(labels().unavailable);
+    const [base] = await discoverAppInitialUrls();
+    const url = localModuleUrl(new URL(runtime.dialogPath, base).href);
+    if (!url) throw new Error(labels().unavailable);
+    const { DeleteThreadDialog } = await import(url);
+    if (typeof DeleteThreadDialog !== "function") throw new Error(labels().unavailable);
+    return { openModal: runtime.openModal, DeleteThreadDialog };
+  }
+
+  async function openNativeDeleteDialog(context) {
     const key = `${SESSION_ACTION_DELETE}:${context.threadKey}`;
     if (inFlight.has(key)) return;
-    if (!await confirmPermanentDelete(context)) return;
+    const epoch = operationEpoch;
     inFlight.add(key);
-    showToast(labels().deleting, "info", 1800);
     try {
-      const readResponse = await sendNativeRequest(context, "thread/read", {
-        threadId: context.threadId,
-        includeTurns: false,
+      const scope = scopeFromRow(context.row);
+      if (!scope) throw new Error(labels().unavailable);
+      const { openModal, DeleteThreadDialog } = await loadNativeDeleteRuntime();
+      if (epoch !== operationEpoch) return;
+      openModal(scope, DeleteThreadDialog, {
+        conversationId: context.threadId,
+        hostId: context.hostId,
+        returnFocusTo: context.row,
       });
-      const thread = threadFromResponse(readResponse);
-      if (thread?.ephemeral === true || thread?.isEphemeral === true) {
-        throw new Error("Ephemeral chats cannot be permanently deleted");
-      }
-      await sendNativeRequest(context, "thread/delete", { threadId: context.threadId });
-      showToast(labels().deleted);
-      const timer = window.setTimeout(() => {
-        uiTimers.delete(timer);
-        if (context.row?.isConnected) showToast(labels().staleDelete, "info", 6000);
-      }, 2200);
-      uiTimers.add(timer);
     } catch (error) {
-      log("error", "thread permanent delete failed", error);
+      log("error", "native thread delete dialog unavailable", error);
       showToast(error?.message || String(error), "error", 6000);
     } finally {
       inFlight.delete(key);
@@ -2113,8 +1991,6 @@ function createSessionThreadActionsManager() {
     inFlight.clear();
     document.getElementById(STYLE_ID)?.remove();
     document.getElementById(TOAST_ID)?.remove();
-    document.querySelector(`[${DIALOG_ATTR}] [data-better-ui-imropvement-delete-cancel]`)?.click();
-    document.querySelector(`[${DIALOG_ATTR}]`)?.remove();
     resolverPromise = null;
     appInitialModulesPromise = null;
     nativeToastPromise = null;

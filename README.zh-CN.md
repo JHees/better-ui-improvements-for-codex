@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.4.23-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.24-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.23 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.4.24 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.4.23 修复 Codex 更新后原生会话服务识别失败，以及已保存的新会话缺少标题生成、导出和删除菜单的问题。详见[版本更新说明](docs/RELEASE-1.4.23.md)。
+1.4.24 改用 Codex 原生确认窗口执行永久删除，并避免重复添加删除菜单项。详见[版本更新说明](docs/RELEASE-1.4.24.md)。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.23`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.4.24`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -89,7 +89,7 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 - **标题生成默认模型**位于标题重新生成开关下方。插件每次启动或热重载都会读取 Codex 的可见模型列表，并在本地保存选择。支持时优先使用 `low` 推理强度，否则使用模型声明的默认强度。选择仅影响压缩后的标题生成。读取失败时可以重试；已保存模型不可用时会保留偏好并提示重新选择。
 - **重新生成标题**会创建 system 来源的临时工作分支，在该分支上触发 Codex 原生压缩，再让所选模型（初始默认 `gpt-5.4-mini`） 在同一压缩上下文中生成结构化标题；结束后永久删除工作分支，原会话不会被压缩或追加消息。
 - **导出 Markdown**位于原生分享和复制操作附近，按时间顺序导出用户与助手文本，并保留本地图片路径标记；系统/开发者上下文、推理和工具载荷不会写入文件。
-- **永久删除**位于菜单最底部并使用危险操作样式，必须明确确认；它调用 Codex 原生 `thread/delete`，不提供插件或 Codex++ 备份与撤销。
+- **永久删除**打开 Codex 原生确认窗口，由原生功能处理删除、进度与错误；已有原生删除菜单项时直接保留，不重复添加。删除包含子代理会话，且无法撤销。原生确认窗口不可用时，插件提示错误，不执行删除。
 - 三项功能各有独立开关。任一功能启用时，会隐藏 Codex++ 旧的行内“更多/删除”按钮，但不会影响 Codex 原生的置顶和归档按钮。
 - 三项功能直接调用本地 Codex App Server，不依赖 Codex++ 会话删除 bridge 或 helper 服务。
 

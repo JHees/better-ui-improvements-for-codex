@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.4.23-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.4.24-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -13,12 +13,12 @@
 
 </div>
 
-Better UI Imropvement 1.4.23 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.4.24 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.4.23 restores native chat service discovery after a Codex update and fixes missing title, export and delete actions on newly persisted conversations. See the [release notes](docs/RELEASE-1.4.23.md).
+Version 1.4.24 uses Codex’s native confirmation dialog for permanent deletion and avoids duplicate delete menu items. See the [release notes](docs/RELEASE-1.4.24.md).
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.23`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.4.24`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -89,7 +89,7 @@ Conversation colors use Codex's stable project ID for both local and cloud conve
 - **Title generation default model** is selectable beneath the title-regeneration switch. The plugin reads Codex’s visible model list on every startup/reload and saves your selection locally. It prefers `low` reasoning when supported, otherwise the model’s default. The choice only affects title generation after compaction. Loading failures offer a retry; unavailable selections remain saved and require choosing an available model.
 - **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks the selected model (initial default: `gpt-5.4-mini`) for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
 - **Export Markdown** appears beside Codex's sharing and copy actions. It exports chronological user and assistant text plus local-image path markers, while excluding system/developer context, reasoning, and tool payloads.
-- **Delete permanently** appears at the bottom as a danger action. It requires an explicit confirmation and uses Codex's native `thread/delete`; there is no plugin or Codex++ backup/undo path.
+- **Delete permanently** opens Codex's native confirmation dialog, which handles deletion, progress and errors. An existing native delete menu item is preserved without adding a duplicate. Deletion includes subagent tasks and cannot be undone. If the native dialog is unavailable, the plugin reports an error without deleting anything.
 - All three additions have independent switches. When any is active, obsolete Codex++ inline More/Delete buttons are hidden without affecting Codex's Pin or Archive controls.
 - These actions call the local Codex App Server directly and do not require the Codex++ session-delete bridge or helper service.
 
