@@ -566,6 +566,9 @@ function createSessionThreadActionsManager() {
         busyThread: "请等待会话完成后再重新生成标题",
         exporting: "正在导出会话…",
         exported: "Markdown 已导出",
+        deleting: "正在删除“{title}”…可继续使用 Codex",
+        deleted: "会话已永久删除",
+        deleteFailed: "删除未完成：{error}",
         unavailable: "Codex 原生会话接口暂不可用",
       }
     : {
@@ -585,6 +588,9 @@ function createSessionThreadActionsManager() {
         busyThread: "Wait for the chat to finish before regenerating its title",
         exporting: "Exporting chat…",
         exported: "Markdown exported",
+        deleting: "Deleting “{title}”… You can keep using Codex",
+        deleted: "Chat permanently deleted",
+        deleteFailed: "Deletion did not complete: {error}",
         unavailable: "The native Codex chat service is unavailable",
       };
 
@@ -912,7 +918,17 @@ function createSessionThreadActionsManager() {
       next.splice(insertAt, 0, exportItem);
     }
 
-    if (enabledActions.has(SESSION_ACTION_DELETE) && !next.some((item) => item?.id === "delete-thread")) {
+    if (enabledActions.has(SESSION_ACTION_DELETE)) {
+      const nativeDeleteIndex = next.findIndex((item) => item?.id === "delete-thread");
+      if (nativeDeleteIndex >= 0) {
+        next[nativeDeleteIndex] = {
+          ...next[nativeDeleteIndex],
+          enabled: next[nativeDeleteIndex].enabled !== false && !inFlight.has(`${SESSION_ACTION_DELETE}:${context.threadKey}`),
+          selectAfterClose: true,
+          onSelect: () => void openNativeDeleteDialog(context),
+        };
+        return next;
+      }
       if (next.length && next[next.length - 1]?.type !== "separator") {
         next.push({ id: DELETE_SEPARATOR_ID, type: "separator" });
       }
@@ -923,6 +939,7 @@ function createSessionThreadActionsManager() {
         destructive: true,
         danger: true,
         tone: "danger",
+        enabled: !inFlight.has(`${SESSION_ACTION_DELETE}:${context.threadKey}`),
         selectAfterClose: true,
         onSelect: () => void openNativeDeleteDialog(context),
       });
@@ -1190,8 +1207,7 @@ function createSessionThreadActionsManager() {
     }
   }
 
-  async function nativeClientFor(context) {
-    const scope = scopeFromRow(context.row);
+  async function nativeClientFor(context, scope = scopeFromRow(context.row)) {
     if (!scope) throw new Error(labels().unavailable);
     const resolver = await loadResolver();
     const client = resolver(scope, context.hostId);
@@ -1891,15 +1907,39 @@ function createSessionThreadActionsManager() {
     return openModal && dialogPath ? { openModal, dialogPath } : null;
   }
 
+  function backgroundDeleteConfirmation(React, NativeDialog, onConfirm) {
+    let submitted = false;
+    return function BetterUiDeleteConfirmation(props) {
+      // Capture crosses the native portal and prevents its blocking handler from sending a second request.
+      return React.createElement("div", {
+        onSubmitCapture(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (submitted) return;
+          submitted = true;
+          props.onClose();
+          onConfirm();
+        },
+      }, React.createElement(NativeDialog, props));
+    };
+  }
+
   async function loadNativeDeleteRuntime() {
     const runtime = nativeDeleteRuntimeFromModules(await loadAppInitialModules());
     if (!runtime) throw new Error(labels().unavailable);
-    const [base] = await discoverAppInitialUrls();
+    const urls = await discoverAppInitialUrls();
+    const [base] = urls;
     const url = localModuleUrl(new URL(runtime.dialogPath, base).href);
     if (!url) throw new Error(labels().unavailable);
     const { DeleteThreadDialog } = await import(url);
     if (typeof DeleteThreadDialog !== "function") throw new Error(labels().unavailable);
-    return { openModal: runtime.openModal, DeleteThreadDialog };
+    const sharedUrl = urls.find(value => /\/app-shared-[\w-]+\.js$/.test(value));
+    if (!sharedUrl) throw new Error(labels().unavailable);
+    const response = await fetch(sharedUrl);
+    if (!response.ok) throw new Error(labels().unavailable);
+    const shared = await import(sharedUrl);
+    const React = shared[nativeFactoryExport(await response.text(), ".createElement=function")]();
+    return { openModal: runtime.openModal, DeleteThreadDialog, React };
   }
 
   async function openNativeDeleteDialog(context) {
@@ -1910,9 +1950,11 @@ function createSessionThreadActionsManager() {
     try {
       const scope = scopeFromRow(context.row);
       if (!scope) throw new Error(labels().unavailable);
-      const { openModal, DeleteThreadDialog } = await loadNativeDeleteRuntime();
+      const { openModal, DeleteThreadDialog, React } = await loadNativeDeleteRuntime();
       if (epoch !== operationEpoch) return;
-      openModal(scope, DeleteThreadDialog, {
+      const Confirmation = backgroundDeleteConfirmation(React, DeleteThreadDialog,
+        () => void deleteThreadInBackground(context, scope, epoch));
+      openModal(scope, Confirmation, {
         conversationId: context.threadId,
         hostId: context.hostId,
         returnFocusTo: context.row,
@@ -1920,6 +1962,26 @@ function createSessionThreadActionsManager() {
     } catch (error) {
       log("error", "native thread delete dialog unavailable", error);
       showToast(error?.message || String(error), "error", 6000);
+    } finally {
+      inFlight.delete(key);
+    }
+  }
+
+  async function deleteThreadInBackground(context, scope, epoch) {
+    const key = `${SESSION_ACTION_DELETE}:${context.threadKey}`;
+    if (epoch !== operationEpoch || inFlight.has(key)) return;
+    inFlight.add(key);
+    let progress;
+    try {
+      progress = await showTitleProgress(labels().deleting.replace("{title}", context.title), scope);
+      const client = await nativeClientFor(context, scope);
+      await client.sendRequest("thread/delete", { threadId: context.threadId });
+      progress.update(labels().deleted, "success", 3800);
+    } catch (error) {
+      log("error", "thread permanent delete failed", error);
+      const message = labels().deleteFailed.replace("{error}", error?.message || String(error));
+      if (progress) progress.update(message, "error", 8000);
+      else showToast(message, "error", 8000);
     } finally {
       inFlight.delete(key);
     }
