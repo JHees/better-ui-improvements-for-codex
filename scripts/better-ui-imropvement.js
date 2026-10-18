@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.24";
+  const VERSION = "1.4.25";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -994,8 +994,7 @@ function createSessionThreadActionsManager() {
   }
 
   function schedulePatch(delay = 80) {
-    if (!enabledActions.size) return;
-    if (scanTimer) window.clearTimeout(scanTimer);
+    if (!enabledActions.size || scanTimer) return;
     scanTimer = window.setTimeout(() => {
       scanTimer = 0;
       patchMenus();
@@ -1989,7 +1988,11 @@ function createSessionThreadActionsManager() {
 
   function start() {
     ensureStyle();
-    observer = new MutationObserver(() => schedulePatch());
+    observer = new MutationObserver((records) => {
+      if (records.some((record) => record.type === "attributes") || mutationsAffect(records, THREAD_SELECTOR)) {
+        schedulePatch();
+      }
+    });
     observer.observe(document.body, {
       attributes: true,
       attributeFilter: [
@@ -2615,6 +2618,16 @@ function isVisibleElement(node) {
     }
 
 const findSidebarSlot = createSidebarSlotFinder();
+
+function mutationsAffect(records, selector) {
+  return records.some((record) => {
+    const target = record.target instanceof Element ? record.target : record.target?.parentElement;
+    if (target?.closest(selector)) return true;
+    return [...record.addedNodes, ...record.removedNodes].some((node) =>
+      node instanceof Element && (node.matches(selector) || node.querySelector(selector)),
+    );
+  });
+}
 
 const FEATURES = {
   "thread-title-regeneration"(api) {
@@ -4169,7 +4182,9 @@ const FEATURES = {
       scanFrame = requestAnimationFrame(() => void scanEditors());
     }
 
-    const observer = new MutationObserver(scheduleScan);
+    const observer = new MutationObserver((records) => {
+      if (mutationsAffect(records, "[data-editor-search-surface], nav ol")) scheduleScan();
+    });
     observer.observe(document.documentElement, {
       childList: true,
       subtree: true,
@@ -4331,8 +4346,7 @@ const FEATURES = {
         pendingRoots.clear();
         pendingRoots.add(document.documentElement);
       }
-      if (scanTimer) window.clearTimeout(scanTimer);
-      scanTimer = window.setTimeout(flushPendingRoots, 100);
+      if (!scanTimer) scanTimer = window.setTimeout(flushPendingRoots, 100);
     };
 
     scanRoot(document);
@@ -5374,6 +5388,7 @@ const FEATURES = {
     const hidden = new Set();
     let observer = null;
     let timer = 0;
+    let disposed = false;
     const guestPending = new WeakSet();
     const guestListeners = new Map();
 
@@ -5420,7 +5435,7 @@ const FEATURES = {
       }
       return node;
     };
-    const scanGuestUsage = () => {
+    const scanGuestUsage = (mutationsAffect) => {
       const STYLE_ID = "codex-plus-hide-usage-alert-style";
       const HIDDEN_ATTR = "data-codex-plus-hidden-usage-alert";
       const STATE_KEY = "__codexPlusUsageAlertGuestState";
@@ -5509,7 +5524,8 @@ const FEATURES = {
         return hiddenCount;
       };
       if (!state.observer) {
-        state.observer = new MutationObserver(() => {
+        state.observer = new MutationObserver((records) => {
+          if (!mutationsAffect(records, quotaSurfaceSelector)) return;
           if (!state.timer) state.timer = window.setTimeout(() => { state.timer = 0; scan(); }, 80);
         });
         state.observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
@@ -5526,11 +5542,12 @@ const FEATURES = {
       document.getElementById("codex-plus-hide-usage-alert-style")?.remove();
     };
     const scanGuests = () => {
+      if (disposed) return;
       for (const guest of document.querySelectorAll("webview")) {
         if (typeof guest.executeJavaScript !== "function" || guestPending.has(guest)) continue;
         guestPending.add(guest);
         try {
-          Promise.resolve(guest.executeJavaScript(`(${scanGuestUsage.toString()})()`, true)).catch(() => {}).finally(() => guestPending.delete(guest));
+          Promise.resolve(guest.executeJavaScript(`(${scanGuestUsage.toString()})(${mutationsAffect.toString()})`, true)).catch(() => {}).finally(() => guestPending.delete(guest));
         } catch {
           guestPending.delete(guest);
         }
@@ -5542,6 +5559,7 @@ const FEATURES = {
       guest.addEventListener("dom-ready", onGuestReady);
       guest.addEventListener("did-stop-loading", onGuestReady);
       guestListeners.set(guest, onGuestReady);
+      onGuestReady();
     };
     const hide = (node) => {
       if (!(node instanceof HTMLElement) || node === document.body || node === document.documentElement) return;
@@ -5556,7 +5574,6 @@ const FEATURES = {
         if (!node.hasAttribute(HIDDEN_ATTR) && shouldHide(node)) hide(node);
       }
       for (const guest of document.querySelectorAll("webview")) attachGuest(guest);
-      scanGuests();
     };
     const schedule = () => {
       if (!timer) timer = window.setTimeout(scan, 80);
@@ -5566,11 +5583,14 @@ const FEATURES = {
     style.id = STYLE_ID;
     style.textContent = `[${HIDDEN_ATTR}="true"] { display: none !important; visibility: hidden !important; pointer-events: none !important; }`;
     document.documentElement.appendChild(style);
-    observer = new MutationObserver(schedule);
+    observer = new MutationObserver((records) => {
+      if (mutationsAffect(records, `${quotaSurfaceSelector}, webview`)) schedule();
+    });
     observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
     scan();
 
     return () => {
+      disposed = true;
       if (timer) window.clearTimeout(timer);
       observer?.disconnect();
       for (const [guest, listener] of guestListeners) {
@@ -6181,6 +6201,7 @@ const FEATURES = {
     `;
     document.head.appendChild(style);
 
+    const sectionCache = new WeakMap();
     const scrollHandlers = new Map();
     const pointerHandlers = new Map();
     const hoverGuardHandlers = new Map();
@@ -6454,18 +6475,13 @@ const FEATURES = {
       if (state.restoreFrame) return;
       const tick = () => {
         state.restoreFrame = 0;
+        if (disposed || !scroller.isConnected) return;
         enforceHoverScrollFreeze(scroller);
         if (performance.now() <= state.freezeUntil) {
           state.restoreFrame = requestAnimationFrame(tick);
         }
       };
       state.restoreFrame = requestAnimationFrame(tick);
-    };
-
-    const queueHoverScrollFreezeChecks = (scroller) => {
-      [0, 16, 80, 180, 360].forEach((delay) => {
-        window.setTimeout(() => enforceHoverScrollFreeze(scroller), delay);
-      });
     };
 
     const freezeHoverScroll = (menu) => {
@@ -6487,7 +6503,6 @@ const FEATURES = {
       state.freezeTop = Math.max(state.freezeTop, stableTop);
       state.freezeUntil = Math.max(state.freezeUntil, now + 450);
       requestHoverScrollFreezeFrame(scroller);
-      queueHoverScrollFreezeChecks(scroller);
     };
 
     const clearHoverScrollFreeze = (scroller) => {
@@ -6771,6 +6786,7 @@ const FEATURES = {
         else inner.appendChild(control);
       }
       const active = favorites.has(key);
+      if (control.dataset.favorite === String(active)) return;
       control.dataset.favorite = active ? "true" : "false";
       control.setAttribute("aria-label", active ? "Remove from favorites" : "Add to favorites");
       control.innerHTML = starIconSvg(active);
@@ -7044,38 +7060,45 @@ const FEATURES = {
       return true;
     };
 
+    const cleanupScroller = (scroller) => {
+      if (!(scroller instanceof HTMLElement)) return;
+      const scrollHandler = scrollHandlers.get(scroller);
+      if (scrollHandler) {
+        scroller.removeEventListener("scroll", scrollHandler);
+        scrollHandlers.delete(scroller);
+      }
+      const animation = scrollAnimations.get(scroller);
+      if (animation) {
+        cancelScrollAnimation(scroller);
+      }
+      const pointerHandler = pointerHandlers.get(scroller);
+      if (pointerHandler) {
+        scroller.removeEventListener("pointermove", pointerHandler);
+        scroller.removeEventListener("pointerdown", pointerHandler);
+        pointerHandlers.delete(scroller);
+      }
+      const wheelHandler = wheelHandlers.get(scroller);
+      if (wheelHandler) {
+        scroller.removeEventListener("wheel", wheelHandler);
+        wheelHandlers.delete(scroller);
+      }
+      const hoverGuardHandler = hoverGuardHandlers.get(scroller);
+      if (hoverGuardHandler) {
+        HOVER_GUARD_EVENTS.forEach((type) =>
+          scroller.removeEventListener(type, hoverGuardHandler, true),
+        );
+        hoverGuardHandlers.delete(scroller);
+      }
+      const freeze = hoverScrollStates.get(scroller);
+      if (freeze?.restoreFrame) cancelAnimationFrame(freeze.restoreFrame);
+      hoverScrollStates.delete(scroller);
+      sectionCache.delete(scroller);
+    };
+
     const cleanupMenu = (menu) => {
       const overlay = menu.closest('[data-composer-overlay-floating-ui="true"]');
       const scroller = menu.querySelector(".vertical-scroll-fade-mask");
-      if (scroller instanceof HTMLElement) {
-        const scrollHandler = scrollHandlers.get(scroller);
-        if (scrollHandler) {
-          scroller.removeEventListener("scroll", scrollHandler);
-          scrollHandlers.delete(scroller);
-        }
-        const animation = scrollAnimations.get(scroller);
-        if (animation) {
-          cancelScrollAnimation(scroller);
-        }
-        const pointerHandler = pointerHandlers.get(scroller);
-        if (pointerHandler) {
-          scroller.removeEventListener("pointermove", pointerHandler);
-          scroller.removeEventListener("pointerdown", pointerHandler);
-          pointerHandlers.delete(scroller);
-        }
-        const wheelHandler = wheelHandlers.get(scroller);
-        if (wheelHandler) {
-          scroller.removeEventListener("wheel", wheelHandler);
-          wheelHandlers.delete(scroller);
-        }
-        const hoverGuardHandler = hoverGuardHandlers.get(scroller);
-        if (hoverGuardHandler) {
-          HOVER_GUARD_EVENTS.forEach((type) =>
-            scroller.removeEventListener(type, hoverGuardHandler, true),
-          );
-          hoverGuardHandlers.delete(scroller);
-        }
-      }
+      cleanupScroller(scroller);
       if (scroller instanceof HTMLElement) removeFavoriteSection(scroller);
       menu.removeAttribute(MENU_ATTR);
       menu.removeAttribute(INPUT_MODE_ATTR);
@@ -7171,8 +7194,8 @@ const FEATURES = {
       titleTimers.set(title, timer);
     };
 
-    const groupSections = (scroller) =>
-      Array.from(scroller.children)
+    const groupSections = (scroller) => {
+      const sections = Array.from(scroller.children)
         .filter(
           (node) =>
             node instanceof HTMLElement &&
@@ -7207,6 +7230,9 @@ const FEATURES = {
           });
           return { group, title, key, color };
         });
+      sectionCache.set(scroller, sections);
+      return sections;
+    };
 
     const renderTopbarIcons = (topbar, sections) => {
       const icons = topbar.querySelector(".codexpp-slash-section-icons");
@@ -7320,7 +7346,8 @@ const FEATURES = {
       scheduleTick();
     };
 
-    const updateTopbar = (scroller, sections = groupSections(scroller)) => {
+    // Scroll only reads section geometry; row decoration belongs to content scans.
+    const updateTopbar = (scroller, sections = sectionCache.get(scroller) || []) => {
       const topbar = scroller.previousElementSibling;
       if (!(topbar instanceof HTMLElement) || !topbar.hasAttribute(TOPBAR_ATTR)) return;
       if (!(topbar instanceof HTMLElement) || sections.length === 0) return;
@@ -7478,6 +7505,9 @@ const FEATURES = {
 
     const scan = () => {
       scanFrame = 0;
+      for (const scroller of scrollHandlers.keys()) {
+        if (!scroller.isConnected) cleanupScroller(scroller);
+      }
       try {
         pruneHomeContentNoise();
       } catch {
@@ -7525,50 +7555,37 @@ const FEATURES = {
       scheduleScan();
     };
 
+    const onComposerInput = (event) => {
+      if (event.target instanceof Element && event.target.closest('.ProseMirror[contenteditable="true"], [data-composer-overlay-floating-ui]')) {
+        scheduleSlashWork();
+      }
+    };
     scan();
-    observer = new MutationObserver(scheduleSlashWork);
+    observer = new MutationObserver((records) => {
+      if (mutationsAffect(records, '.ProseMirror[contenteditable="true"], [data-composer-overlay-floating-ui], ' + NAV_NOISE_SELECTOR)) {
+        scheduleSlashWork();
+      }
+    });
     observer.observe(document.body, OBSERVER_OPTIONS);
-    document.addEventListener("input", scheduleSlashWork, true);
-    document.addEventListener("keyup", scheduleSlashWork, true);
+    document.addEventListener("input", onComposerInput, true);
+    document.addEventListener("keyup", onComposerInput, true);
     window.addEventListener("codexpp-slash-section-shortcut", onSectionShortcutBridge);
     window.addEventListener("keydown", onSectionShortcut, true);
     document.addEventListener("keydown", onSectionShortcut, true);
-    const activeSlashInterval = window.setInterval(() => {
-      if (isSlashQueryActive()) scheduleSlashWork();
-    }, 250);
 
     return () => {
       disposed = true;
       observer.disconnect();
-      window.clearInterval(activeSlashInterval);
       if (scanFrame) cancelAnimationFrame(scanFrame);
       if (scanTimer) window.clearTimeout(scanTimer);
       if (homePruneFrame) cancelAnimationFrame(homePruneFrame);
       if (hardPruneTimer) window.clearTimeout(hardPruneTimer);
-      document.removeEventListener("input", scheduleSlashWork, true);
-      document.removeEventListener("keyup", scheduleSlashWork, true);
+      document.removeEventListener("input", onComposerInput, true);
+      document.removeEventListener("keyup", onComposerInput, true);
       window.removeEventListener("codexpp-slash-section-shortcut", onSectionShortcutBridge);
       window.removeEventListener("keydown", onSectionShortcut, true);
       document.removeEventListener("keydown", onSectionShortcut, true);
-      for (const [scroller, handler] of scrollHandlers) {
-        scroller.removeEventListener("scroll", handler);
-      }
-      scrollHandlers.clear();
-      for (const [scroller, handler] of pointerHandlers) {
-        scroller.removeEventListener("pointermove", handler);
-        scroller.removeEventListener("pointerdown", handler);
-      }
-      pointerHandlers.clear();
-      for (const [scroller, handler] of wheelHandlers) {
-        scroller.removeEventListener("wheel", handler);
-      }
-      wheelHandlers.clear();
-      for (const [scroller, handler] of hoverGuardHandlers) {
-        HOVER_GUARD_EVENTS.forEach((type) =>
-          scroller.removeEventListener(type, handler, true),
-        );
-      }
-      hoverGuardHandlers.clear();
+      for (const scroller of scrollHandlers.keys()) cleanupScroller(scroller);
       if (documentHoverGuard) {
         HOVER_GUARD_EVENTS.forEach((type) =>
           window.removeEventListener(type, documentHoverGuard, true),
@@ -7780,21 +7797,6 @@ const FEATURES = {
     const normalize = (value) =>
       String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
 
-    const visible = (node) => {
-      if (!(node instanceof HTMLElement) || !node.isConnected) return false;
-      if (node.closest("[hidden], [inert], [aria-hidden='true']")) return false;
-      const style = window.getComputedStyle(node);
-      if (
-        style.display === "none" ||
-        style.visibility === "hidden" ||
-        style.opacity === "0"
-      ) {
-        return false;
-      }
-      const rect = node.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    };
-
     const mainSidebar = () => {
       const aside = document.querySelector(ASIDE_SELECTOR);
       return aside instanceof HTMLElement ? aside : null;
@@ -7837,13 +7839,8 @@ const FEATURES = {
 
     const isProjectRow = (node) => {
       if (!(node instanceof HTMLElement)) return false;
-      if (!visible(node)) return false;
-
-      const nativeRow = nativeProjectRowFor(node);
-      if (nativeRow) {
-        const label = projectLabelFor(node);
-        return Boolean(label && label.length >= 2 && label.length <= 80 && !EXCLUDED_LABELS.has(label));
-      }
+      // Native identity is authoritative, including rows awaiting layout.
+      if (nativeProjectRowFor(node)) return true;
 
       if (node.getAttribute("role") !== "listitem" || !node.classList.contains("group/cwd")) return false;
 
@@ -7950,7 +7947,6 @@ const FEATURES = {
           continue;
         }
         setAttr(row, ATTR, "row");
-        setAttr(row, "data-codexpp-sidebar-project-expanded", String(isExpandedProject(row)));
         setStyleVar(row, "--codexpp-project-tint", tintFor(info));
         setStyleVar(row, "--codexpp-project-text-color", textColorFor(info));
         setStyleVar(row, "--codexpp-project-background", `var(--codexpp-project-${paletteFor(info).id}-background)`);
@@ -8006,11 +8002,6 @@ const FEATURES = {
       }
     };
 
-    const isExpandedProject = (row) => {
-      if (row.getBoundingClientRect().height > 40) return true;
-      return Boolean(row.querySelector('[role="list"][aria-label]'));
-    };
-
     const markProjectParts = (row, label) => {
       const nativeHeader = nativeProjectRowFor(row);
       const header = Array.from(row.querySelectorAll("[role='button'][aria-label]"))
@@ -8023,8 +8014,7 @@ const FEATURES = {
       });
 
       const title = Array.from(target.querySelectorAll("span"))
-        .filter((node) => node instanceof HTMLElement && normalize(node.textContent) === normalize(label))
-        .sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0];
+        .find((node) => node instanceof HTMLElement && normalize(node.textContent) === normalize(label));
       if (title instanceof HTMLElement) setAttr(title, ATTR, "title");
 
       row.querySelectorAll(
@@ -8122,9 +8112,8 @@ const FEATURES = {
         if (colorId === "auto") delete colorPrefs[key];
         else colorPrefs[key] = colorId;
       }
-      applyColorToCurrentRows(info);
+      apply();
       persistColorPrefs();
-      applyColorToCurrentRows(info);
       scheduleApply();
     };
 
@@ -8201,18 +8190,6 @@ const FEATURES = {
       }
     };
 
-    const applyColorToCurrentRows = (info) => {
-      const sidebar = mainSidebar();
-      if (!sidebar) return;
-      const rows = candidateRows(sidebar).filter((row) => {
-        const candidate = projectInfoFor(row);
-        return info?.id
-          ? candidate.id === normalize(info.id)
-          : candidate.label === projectKey(info?.label);
-      });
-      markRows(rows);
-    };
-
     let activeSidebar = null;
     const apply = () => {
       const sidebar = mainSidebar();
@@ -8221,19 +8198,7 @@ const FEATURES = {
         return;
       }
 
-      let rows = candidateRows(sidebar);
-      rows = rows.filter((node, index) => rows.indexOf(node) === index);
-      const seenLabels = new Set();
-      rows = rows.filter((node) => {
-        const label = projectLabelFor(node);
-        if (!label || seenLabels.has(label)) return false;
-        seenLabels.add(label);
-        return true;
-      });
-      if (!rows.length) {
-        return;
-      }
-
+      const rows = candidateRows(sidebar);
       reconcileMarkedRows(rows);
       markRows(rows);
       if (apply._lastCount !== rows.length) {
@@ -8293,9 +8258,8 @@ const FEATURES = {
     };
 
     const scheduleApply = (delay = 140) => {
-      if (disposed) return;
+      if (disposed || scheduleTimer) return;
       scheduled = true;
-      if (scheduleTimer) window.clearTimeout(scheduleTimer);
       scheduleTimer = window.setTimeout(runScheduledApply, delay);
     };
 
@@ -8443,15 +8407,6 @@ const FEATURES = {
 
     const normalize = (value) =>
       String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
-
-    const visible = (node) => {
-      if (!(node instanceof HTMLElement) || !node.isConnected) return false;
-      if (node.closest("[hidden], [inert], [aria-hidden='true']")) return false;
-      const computed = window.getComputedStyle(node);
-      if (computed.display === "none" || computed.visibility === "hidden" || computed.opacity === "0") return false;
-      const rect = node.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    };
 
     const mainSidebar = () => {
       const aside = document.querySelector(ASIDE_SELECTOR);
@@ -8628,7 +8583,7 @@ const FEATURES = {
       const index = projectIndex(sidebar);
       const active = new Set();
       for (const thread of sidebar.querySelectorAll(THREAD_SELECTOR)) {
-        if (!(thread instanceof HTMLElement) || !visible(thread)) continue;
+        if (!(thread instanceof HTMLElement)) continue;
         const info = projectForThread(thread, index);
         if (!info) {
           clearRow(thread);
@@ -8639,8 +8594,10 @@ const FEATURES = {
           continue;
         }
         const palette = paletteFor(info);
-        thread.setAttribute(ATTR, "row");
-        thread.style.setProperty("--codexpp-project-tint", palette.value);
+        if (thread.getAttribute(ATTR) !== "row") thread.setAttribute(ATTR, "row");
+        if (thread.style.getPropertyValue("--codexpp-project-tint") !== palette.value) {
+          thread.style.setProperty("--codexpp-project-tint", palette.value);
+        }
         active.add(thread);
       }
       sidebar.querySelectorAll(`[${ATTR}="row"]`).forEach((row) => {
@@ -8649,8 +8606,7 @@ const FEATURES = {
     };
 
     const scheduleApply = (delay = 100) => {
-      if (disposed) return;
-      if (applyTimer) window.clearTimeout(applyTimer);
+      if (disposed || applyTimer) return;
       applyTimer = window.setTimeout(() => {
         applyTimer = 0;
         apply();
@@ -8677,12 +8633,11 @@ const FEATURES = {
     window.addEventListener(COLOR_EVENT, colorEventHandler);
     apply();
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: [
-      "aria-selected",
       "data-app-action-sidebar-project-id",
       "data-app-action-sidebar-project-label",
       "data-app-action-sidebar-project-list-id",
-      "data-app-action-sidebar-thread-active",
-      "data-app-action-sidebar-thread-selected",
+      "data-project-id",
+      "data-project-name",
       "data-app-action-sidebar-thread-row",
       "data-thread-title",
     ] });

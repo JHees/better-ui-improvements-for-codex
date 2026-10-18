@@ -5,6 +5,82 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../scripts/better-ui-imropvement.js", import.meta.url), "utf8");
 
+const backgrounds = source.slice(source.indexOf('  "sidebar-project-backgrounds"(api) {'));
+const featureFunction = (body, name) => body.match(new RegExp(`    const ${name} = \\([\\s\\S]*?\\n    \\};`, "u"))[0];
+
+test("native projects remain eligible before layout and regardless of their label", () => {
+  class Element { constructor(label) { this.label = label; } }
+  const eligible = vm.runInNewContext(`${featureFunction(backgrounds, "isProjectRow")}\nisProjectRow`, {
+    HTMLElement: Element, visible: () => false, nativeProjectRowFor: node => node,
+    projectLabelFor: node => node.label, EXCLUDED_LABELS: new Set(["projects"]),
+  });
+  for (const label of ["Project", "x", "projects", "a".repeat(81), ""]) {
+    assert.equal(eligible(new Element(label)), true, "native project markers establish identity before layout completes");
+  }
+});
+
+test("a full project scan colors separate rows with the same name and reconciles an empty list", () => {
+  const rows = [{ id: "local-1", label: "Project" }, { id: "cloud-1", label: "Project" }];
+  let marked, reconciled;
+  class Element {}
+  const sidebar = new Element();
+  const scan = vm.runInNewContext(`let activeSidebar;\n${featureFunction(backgrounds, "apply")}\napply`, {
+    HTMLElement: Element, mainSidebar: () => sidebar, candidateRows: () => rows,
+    projectLabelFor: node => node.label, reconcileMarkedRows: value => { reconciled = [...value]; },
+    markRows: value => { marked = [...value]; }, api: { log: { info() {} } },
+  });
+  scan();
+  assert.deepEqual(marked, rows);
+  assert.deepEqual(reconciled, rows);
+  rows.length = 0;
+  scan();
+  assert.deepEqual(marked, []);
+  assert.deepEqual(reconciled, []);
+});
+
+test("changing one project color refreshes all project rows without dropping other menu hooks", () => {
+  let allScans = 0, partialScans = 0, persisted = 0;
+  const prefs = {};
+  const choose = vm.runInNewContext(`${featureFunction(backgrounds, "setProjectColor")}\nsetProjectColor`, {
+    colorPrefs: prefs, preferenceKeysFor: info => [`id:${info.id}`],
+    apply: () => { allScans += 1; }, applyColorToCurrentRows: () => { partialScans += 1; },
+    persistColorPrefs: () => { persisted += 1; }, scheduleApply() {},
+  });
+  choose({ id: "project-1" }, "green");
+  assert.equal(prefs["id:project-1"], "green");
+  assert.equal(allScans, 1);
+  assert.equal(partialScans, 0);
+  assert.equal(persisted, 1);
+});
+
+for (const feature of ["sidebar-project-backgrounds", "sidebar-conversation-colors"]) {
+  test(`${feature} refreshes during continuous sidebar updates without postponing the timer`, () => {
+    const body = source.slice(source.indexOf(`  "${feature}"(api) {`));
+    const callbacks = new Map();
+    let nextId = 1, applied = 0;
+    const window = {
+      setTimeout: callback => { const id = nextId++; callbacks.set(id, callback); return id; },
+      clearTimeout: id => callbacks.delete(id),
+    };
+    const setup = feature === "sidebar-project-backgrounds"
+      ? `let scheduled = false, scheduleTimer = 0;\n${featureFunction(body, "runScheduledApply")}`
+      : "let applyTimer = 0;";
+    const schedule = vm.runInNewContext(`${setup}\n${featureFunction(body, "scheduleApply")}\nscheduleApply`, {
+      window, disposed: false, apply: () => { applied += 1; },
+    });
+    schedule();
+    const first = [...callbacks.keys()][0];
+    for (let i = 0; i < 20; i++) schedule();
+    assert.equal(callbacks.size, 1);
+    assert.ok(callbacks.has(first), "subsequent mutations must not postpone the pending refresh");
+    callbacks.get(first)();
+    assert.equal(applied, 1);
+    callbacks.clear();
+    schedule();
+    assert.equal(callbacks.size, 1, "the next batch must still schedule after the first refresh");
+  });
+}
+
 // The native sidebar retained its appearance attribute when its layout moved
 // from utility classes into a CSS module. Exercise each feature's lookup.
 for (const feature of ["sidebar-project-backgrounds", "sidebar-conversation-colors"]) {
