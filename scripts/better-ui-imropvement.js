@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.25";
+  const VERSION = "1.4.26";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -43,6 +43,13 @@
       detail: "在侧栏显示 5 小时和每周额度；点击额度可切换周期，有 Credit 数据时一并显示。",
       defaultEnabled: true,
       status: "当前页面暴露额度信号时可用",
+    },
+    {
+      id: "hide-native-usage",
+      title: "隐藏原生额度按钮",
+      detail: "隐藏 Codex 26.1021 侧栏底部的原生“用量”按钮；Better UI 的额度显示不受影响。",
+      defaultEnabled: true,
+      status: "可用",
     },
     {
       id: "app-theme-toggle",
@@ -4365,6 +4372,20 @@ const FEATURES = {
       }
       hidden.clear();
     };
+  },
+
+  /** Hide the native 26.1021 Usage button while keeping the Better UI quota widget. */
+  "hide-native-usage"() {
+    const STYLE_ID = "better-ui-hide-native-usage-style";
+    document.getElementById(STYLE_ID)?.remove();
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      nav[data-app-navigation-rail] button[aria-label="用量"]:not([data-codexpp]),
+      nav[data-app-navigation-rail] button[aria-label="Usage"]:not([data-codexpp]) { display: none !important; }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
   },
 
   /**
@@ -9389,7 +9410,7 @@ function writeFlag(api, id, on) {
       {
         id: "usage",
         title: "额度",
-        features: ["show-usage-in-sidebar", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
+        features: ["show-usage-in-sidebar", "hide-native-usage", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
       },
       {
         id: "sidebar",
