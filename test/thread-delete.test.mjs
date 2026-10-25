@@ -32,15 +32,15 @@ test('delete menu reuses an existing native item and closes before opening the d
   assert.deepEqual(selected, [context, context]);
 });
 
-test('native delete discovery follows renamed exports and the bundled dialog path', () => {
+test('native delete discovery resolves the hashed per-thread dialog bundle from its menu factory', () => {
   const discover = vm.runInNewContext(`${extract('  function nativeDeleteRuntimeFromModules(', '  async function loadNativeDeleteRuntime(')};nativeDeleteRuntimeFromModules`);
   function modal(scope, component, props, options) {
     return scope.set('dialogs', state => ({modals: state.modals.find(item => item.ModalComponent === component), ModalComponent: component, props, blocksOtherModals: options?.blocksOtherModals}));
   }
-  function menu() { return {id: 'delete-thread', onSelect: () => import('./delete-thread-dialog-new.js').then(m => m.DeleteThreadDialog)}; }
+  function menu() { return {id: 'delete-thread', onSelect: async () => { const {DeleteThreadDialog: dialog} = await import(`./delete-thread-dialog-e66a581a418b.js`); return dialog; }}; }
   const runtime = discover([{renamed: modal}, {alsoRenamed: menu}]);
   assert.equal(runtime.openModal, modal);
-  assert.equal(runtime.dialogPath, './delete-thread-dialog-new.js');
+  assert.equal(runtime.dialogPath, './delete-thread-dialog-e66a581a418b.js');
   assert.equal(discover([{unrelated: () => 'DeleteThreadDialog'}]), null);
 });
 

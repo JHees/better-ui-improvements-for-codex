@@ -45,6 +45,13 @@
       status: "当前页面暴露额度信号时可用",
     },
     {
+      id: "hide-native-usage",
+      title: "隐藏原生额度按钮",
+      detail: "隐藏 Codex 26.1021 侧栏底部的原生“用量”按钮；Better UI 的额度显示不受影响。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
       id: "app-theme-toggle",
       title: "明暗主题切换按钮",
       detail: "在侧栏独立显示明暗切换按钮，切换并保存 Codex App 的浅色 / 深色外观；悬停显示目标外观。",
@@ -518,6 +525,7 @@ function createSessionThreadActionsManager() {
   }
   const enabledActions = new Set();
   const patchedMenuRefs = new Map();
+  const stableMenuRefs = new WeakMap();
   const uiTimers = new Set();
   const retryTimers = new Set();
   const inFlight = new Set();
@@ -846,6 +854,34 @@ function createSessionThreadActionsManager() {
     };
   }
 
+  function createStableMenuRef(state, initialNative) {
+    const originalUpdate = state.update;
+    let latestNative = initialNative;
+    const native = function (...args) { return latestNative.apply(this, args); };
+    let current = native;
+    const update = function (next) {
+      latestNative = next;
+      return originalUpdate.call(this, current);
+    };
+    return {
+      get active() { return state.update === update; },
+      get current() { return state.update === update ? current : native; },
+      set current(next) {
+        if (next === native) {
+          if (state.update !== update) return;
+          state.update = originalUpdate;
+          originalUpdate.call(state, latestNative);
+          current = native;
+          return;
+        }
+        if (state.update !== originalUpdate && state.update !== update) return;
+        current = next;
+        state.update = update;
+        originalUpdate.call(state, current);
+      },
+    };
+  }
+
   function threadMenuRefFor(row) {
     const fibers = [];
     for (let fiber = reactFiberFor(row), depth = 0; fiber && depth < 20; depth += 1, fiber = fiber.return) {
@@ -858,6 +894,17 @@ function createSessionThreadActionsManager() {
       let hook = fiber.memoizedState;
       for (let index = 0; hook && index < 256; index += 1, hook = hook.next) {
         const ref = hook.memoizedState;
+        // Codex 26.1021 keeps the shared menu factory in an updateable callback, not ref.current.
+        if (typeof ref?.callback === "function" && typeof ref?.update === "function") {
+          const existing = stableMenuRefs.get(ref);
+          if (existing?.active) return existing;
+          const native = hook.next?.memoizedState?.deps?.[0];
+          if (typeof native === "function" && isThreadMenuFactorySource(Function.prototype.toString.call(native))) {
+            const adapter = createStableMenuRef(ref, native);
+            stableMenuRefs.set(ref, adapter);
+            return adapter;
+          }
+        }
         const candidate = ref?.current;
         if (typeof candidate !== "function") continue;
         // Keep an already wrapped native menu discoverable on later scans. Without
@@ -974,11 +1021,13 @@ function createSessionThreadActionsManager() {
       if (original.__betterUiImropvementThreadMenuOriginal) original = original.__betterUiImropvementThreadMenuOriginal;
       record = { context, original, wrapped: null };
       record.wrapped = function betterUiImropvementThreadContextItems(...args) {
+        const epoch = operationEpoch;
+        const context = record.context;
         const result = record.original.apply(this, args);
         if (result && typeof result.then === "function") {
-          return result.then((items) => appendThreadActions(items, record.context));
+          return result.then((items) => epoch === operationEpoch ? appendThreadActions(items, context) : items);
         }
-        return appendThreadActions(result, record.context);
+        return appendThreadActions(result, context);
       };
       record.wrapped.__betterUiImropvementThreadMenuOriginal = original;
       try {
@@ -1050,7 +1099,7 @@ function createSessionThreadActionsManager() {
     const urls = new Set();
     const collect = (value, base = document.baseURI) => {
       const matches = String(value || "").matchAll(
-        /(?:\.\/|\/)?(?:assets\/)?app-(?:initial|shared)-[A-Za-z0-9_-]+\.js/g,
+        /(?:\.\/|\/)?(?:assets\/)?app-(?:initial|primary|shared)-[A-Za-z0-9_-]+\.js/g,
       );
       for (const match of matches) {
         let resolved = match[0];
@@ -1061,6 +1110,7 @@ function createSessionThreadActionsManager() {
         if (url) urls.add(url);
       }
     };
+    for (const link of document.querySelectorAll('link[rel="modulepreload"][href]')) collect(link.href);
     for (const script of document.querySelectorAll("script[src]")) collect(script.src);
     try {
       for (const resource of performance.getEntriesByType("resource")) collect(resource.name);
@@ -2015,6 +2065,7 @@ function createSessionThreadActionsManager() {
     onWindowFocus = () => schedulePatch(0);
     document.addEventListener("pointerdown", onThreadPointerDown, true);
     document.addEventListener("contextmenu", onThreadPointerDown, true);
+    document.addEventListener("keydown", onThreadPointerDown, true);
     window.addEventListener("focus", onWindowFocus);
     patchMenus();
     schedulePatch(300);
@@ -2035,6 +2086,7 @@ function createSessionThreadActionsManager() {
     if (onThreadPointerDown) {
       document.removeEventListener("pointerdown", onThreadPointerDown, true);
       document.removeEventListener("contextmenu", onThreadPointerDown, true);
+      document.removeEventListener("keydown", onThreadPointerDown, true);
       onThreadPointerDown = null;
     }
     if (onWindowFocus) {
@@ -2602,6 +2654,92 @@ function createSidebarSlotFinder() {
     return findSidebarSlot;
 }
 
+function createCodexSidebarAdapter(api) {
+  const ensureUsageSlot = createSidebarSlotFinder();
+  const RAIL_SELECTOR = 'nav[data-app-navigation-rail], aside.app-shell-left-panel nav[class~="group/sidebar-rail"]';
+  let stopHidingUsage = null;
+
+  const currentUsageButtons = () => {
+    const rails = [...document.querySelectorAll("nav[data-app-navigation-rail]")];
+    const splitRail = document.querySelector('aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
+    if (splitRail) rails.push(splitRail);
+    return [...new Set(rails.flatMap((rail) => [...rail.querySelectorAll('button[aria-label]')]))]
+      .filter((button) => {
+        const label = (button.getAttribute("aria-label") || "").trim().toLowerCase();
+        return (label === "usage" || label === "用量") && !button.closest("[data-codexpp]");
+      });
+  };
+
+  const usageMutationsAffect = (records) => records.some((record) => {
+    const relevant = (node) => node?.closest?.(RAIL_SELECTOR) ||
+      node?.matches?.(RAIL_SELECTOR) || node?.querySelector?.(RAIL_SELECTOR);
+    if (relevant(record.target)) return true;
+    return [...record.addedNodes, ...record.removedNodes].some(relevant);
+  });
+
+  const hideNativeUsageButtons = () => {
+    stopHidingUsage?.();
+    const previous = new Map();
+    const restore = (button, display) => {
+      button.style.setProperty("display", display.value, display.priority);
+    };
+    const reconcile = () => {
+      const buttons = currentUsageButtons();
+      const current = new Set(buttons);
+      for (const [button, display] of previous) {
+        if (current.has(button)) continue;
+        restore(button, display);
+        previous.delete(button);
+      }
+      for (const button of buttons) {
+        if (!previous.has(button)) {
+          previous.set(button, {
+            value: button.style.getPropertyValue("display"),
+            priority: button.style.getPropertyPriority("display"),
+          });
+        }
+        button.style.setProperty("display", "none", "important");
+      }
+    };
+    const options = {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-label", "data-app-navigation-rail"],
+    };
+    let stopObserving;
+    if (typeof api.dom?.observe === "function") {
+      stopObserving = api.dom.observe(document, (records) => {
+        if (usageMutationsAffect(records)) reconcile();
+      }, options);
+    } else {
+      const observer = new MutationObserver((records) => {
+        if (usageMutationsAffect(records)) reconcile();
+      });
+      observer.observe(document, options);
+      stopObserving = () => observer.disconnect();
+    }
+    reconcile();
+    let active = true;
+    const stop = () => {
+      if (!active) return;
+      active = false;
+      stopObserving();
+      for (const [button, display] of previous) restore(button, display);
+      previous.clear();
+      if (stopHidingUsage === stop) stopHidingUsage = null;
+    };
+    stopHidingUsage = stop;
+    return stop;
+  };
+
+  return Object.freeze({
+    ensureUsageSlot,
+    hideNativeUsageButtons,
+    stop() { stopHidingUsage?.(); },
+  });
+}
+
 function isVisibleElement(node) {
       if (!(node instanceof HTMLElement) || !node.isConnected) return false;
       if (node.closest("[hidden], [inert], [aria-hidden='true']")) return false;
@@ -2616,8 +2754,6 @@ function isVisibleElement(node) {
       const rect = node.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
     }
-
-const findSidebarSlot = createSidebarSlotFinder();
 
 function mutationsAffect(records, selector) {
   return records.some((record) => {
@@ -4367,6 +4503,11 @@ const FEATURES = {
     };
   },
 
+  /** Hide the native Usage button while keeping the Better UI quota widget. */
+  "hide-native-usage"(api) {
+    return api.codexSidebar.hideNativeUsageButtons();
+  },
+
   /**
    * Surface 5h + Weekly rate limits and points balance in the sidebar slot
    * where the "Upgrade" pill lives. Sources its data from Codex's
@@ -5159,7 +5300,7 @@ const FEATURES = {
     const ensureMounted = (forceRebuild = false) => {
       if (disposed) return;
       const visibleSnapshot = displaySnapshot();
-      const slot = findSidebarSlot();
+      const slot = api.codexSidebar.ensureUsageSlot();
       if (!slot) {
         if (mounted) {
           mounted.remove();
@@ -5309,7 +5450,7 @@ const FEATURES = {
         : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${dark ? '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>' : '<path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/>'}</svg>`;
     };
     const refresh = () => {
-      const slot = findSidebarSlot();
+      const slot = api.codexSidebar.ensureUsageSlot();
       if (!slot) { button.remove(); return; }
       if (button.parentElement !== slot) {
         const previousSlot = button.parentElement;
@@ -5633,8 +5774,11 @@ const FEATURES = {
     const FAVORITE_DUPLICATE_HIDDEN_ATTR =
       "data-codexpp-slash-favorite-duplicate-hidden";
     const FAVORITES_STORAGE_KEY = "codexpp.slashMenuFavorites.v1";
+    const FAVORITE_METADATA_STORAGE_KEY = "codexpp.slashMenuFavoriteMetadata.v1";
+    const FAVORITE_ACTIVATION_TIMEOUT = 750;
     const FAVORITE_BUTTON_CLASS = "codexpp-slash-favorite-button";
     const SKILL_COPY_CLASS = "codexpp-slash-skill-copy";
+    const DESCRIPTION_SELECTOR = 'span[class*="text-token-description-foreground"], span[class*="text-codex-description"]';
     document.getElementById(STYLE_ID)?.remove();
 
     const style = document.createElement("style");
@@ -6210,6 +6354,11 @@ const FEATURES = {
     const hoverSuppressStates = new WeakMap();
     const scrollAnimations = new Map();
     const titleTimers = new Map();
+    const favoriteActivationTimers = new Set();
+    const nativeSlashEntryCache = new WeakMap();
+    let nativeSlashEntryGeneration = 0;
+    let favoriteActivationInFlight = false;
+    let pendingFavoriteActivation = null;
     const HOVER_GUARD_EVENTS = [
       "pointermove",
       "pointerover",
@@ -6240,6 +6389,22 @@ const FEATURES = {
     let documentHoverGuard = null;
     let slashRowScrollAllowedUntil = 0;
     const nativeScrollIntoView = Element.prototype.scrollIntoView;
+
+    const setFavoriteActivationTimer = (callback, delay) => {
+      let timer;
+      timer = window.setTimeout(() => {
+        favoriteActivationTimers.delete(timer);
+        callback();
+      }, delay);
+      favoriteActivationTimers.add(timer);
+      return timer;
+    };
+
+    const clearFavoriteActivationTimer = (timer) => {
+      if (timer === undefined || timer === null) return;
+      window.clearTimeout(timer);
+      favoriteActivationTimers.delete(timer);
+    };
 
     const normText = (node) =>
       String(node?.textContent || "").replace(/\s+/g, " ").trim();
@@ -6274,7 +6439,10 @@ const FEATURES = {
         event.stopImmediatePropagation?.();
         return;
       }
-      freezeHoverScroll(menu);
+      const row = event.target instanceof Element
+        ? event.target.closest('[data-list-navigation-item="true"]')
+        : null;
+      if (row instanceof HTMLElement && menu.contains(row)) freezeHoverScroll(menu);
       event.stopPropagation();
       event.stopImmediatePropagation?.();
     };
@@ -6499,9 +6667,9 @@ const FEATURES = {
         state.lastTop = scroller.scrollTop;
         return;
       }
-      const stableTop = Math.max(state.lastTop, scroller.scrollTop);
-      state.freezeTop = Math.max(state.freezeTop, stableTop);
-      state.freezeUntil = Math.max(state.freezeUntil, now + 450);
+      state.freezeTop = scroller.scrollTop;
+      state.lastTop = scroller.scrollTop;
+      state.freezeUntil = now + 450;
       requestHoverScrollFreezeFrame(scroller);
     };
 
@@ -6627,11 +6795,60 @@ const FEATURES = {
       }, 60);
     };
 
-    const sectionKey = (title) =>
-      String(title || "General")
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/gi, "")
-        .toLowerCase() || "general";
+    const sectionKey = (title) => {
+      const value = String(title || "General").replace(/\s+/g, " ").trim();
+      if (value === "技能") return "skills";
+      if (value === "常用") return "general";
+      if (value === "收藏") return "favorites";
+      if (value === "命令") return "commands";
+      return value.replace(/\s+/g, "-").replace(/[^a-z0-9\p{L}-]/giu, "").toLowerCase() || "general";
+    };
+
+    const displaySectionTitle = (title) => {
+      if (!/^zh/i.test(document.documentElement.lang || "")) return title;
+      return title === "General" ? "常用" : title === "Favorites" ? "收藏" : title === "commands" ? "命令" : title;
+    };
+
+    const nativeSlashEntry = (row, refresh = false) => {
+      const cached = nativeSlashEntryCache.get(row);
+      if (!refresh && cached?.generation === nativeSlashEntryGeneration) return cached.entry;
+      let itemIndex = null;
+      let itemKey = null;
+      let sections = null;
+      const fiberKey = Object.getOwnPropertyNames(row).find((key) => key.startsWith("__reactFiber$"));
+      for (let fiber = fiberKey ? row[fiberKey] : null, depth = 0; fiber && depth < 16; depth += 1, fiber = fiber.return) {
+        if (!itemKey && typeof fiber.key === "string") itemKey = fiber.key;
+        for (const props of [fiber.memoizedProps, fiber.pendingProps]) {
+          if (itemIndex === null && Number.isInteger(props?.itemIndex)) itemIndex = props.itemIndex;
+          if (!sections && Array.isArray(props?.sections)) sections = props.sections;
+        }
+        if (itemIndex !== null && sections) break;
+      }
+      if ((!itemKey && itemIndex === null) || !sections) {
+        nativeSlashEntryCache.set(row, {generation: nativeSlashEntryGeneration, entry: null});
+        return null;
+      }
+      const sectionId = row.closest("[data-mention-section-id]")?.getAttribute("data-mention-section-id");
+      const items = sections.flatMap((section) => (section.items || []).map((item) => ({section, item})));
+      const entry = (itemKey && items.find(({item}) => item.key === itemKey)) || items[itemIndex];
+      const section = entry?.section || sections.find((value) => value.id === sectionId) || sections[0];
+      const item = entry?.item;
+      if (!item) {
+        nativeSlashEntryCache.set(row, {generation: nativeSlashEntryGeneration, entry: null});
+        return null;
+      }
+      const content = item.content?.props || {};
+      const label = String(content.title || content.item?.title || item.title || "").trim();
+      const descriptionNode = row.querySelector(DESCRIPTION_SELECTOR);
+      const result = {
+        section: String(section.title || section.id || "General"),
+        label,
+        description: String(content.description || content.item?.description || item.description || favoriteText(descriptionNode) || "").trim(),
+        query: String(content.query || label).trim(),
+      };
+      nativeSlashEntryCache.set(row, {generation: nativeSlashEntryGeneration, entry: result});
+      return result;
+    };
 
     const sectionColor = (key, index) => {
       const known = {
@@ -6692,13 +6909,133 @@ const FEATURES = {
       }
     };
 
-    const rowFavoriteKey = (button, fallbackSectionKey) => {
-      const section = fallbackSectionKey || button.getAttribute(SECTION_ATTR) || "general";
-      const text = normText(button)
+    const readFavoriteMetadata = () => {
+      try {
+        const values = JSON.parse(window.localStorage?.getItem(FAVORITE_METADATA_STORAGE_KEY) || "[]");
+        return new Map(
+          Array.isArray(values)
+            ? values.filter((value) =>
+                value && typeof value.key === "string" && value.value &&
+                typeof value.value.label === "string",
+              ).map(({ key, value }) => [key, value])
+            : [],
+        );
+      } catch {
+        return new Map();
+      }
+    };
+
+    const writeFavoriteMetadata = (metadata) => {
+      try {
+        window.localStorage?.setItem(
+          FAVORITE_METADATA_STORAGE_KEY,
+          JSON.stringify(Array.from(metadata, ([key, value]) => ({ key, value }))),
+        );
+      } catch {
+        // Ignore storage failures; the row controls still update for this render.
+      }
+    };
+
+    const favoriteText = (node) => {
+      if (!(node instanceof HTMLElement)) return "";
+      const copy = node.cloneNode(true);
+      copy.querySelectorAll(`svg, style, script, .ml-auto, .ms-auto, [class*="ms-auto"], .${FAVORITE_BUTTON_CLASS}`).forEach((child) => child.remove());
+      return normText(copy);
+    };
+
+    const favoriteRowLabel = (row) => {
+      const native = nativeSlashEntry(row);
+      if (native?.label) return native.label;
+      const descriptionNode = row.querySelector(DESCRIPTION_SELECTOR);
+      const titleNode =
+        row.querySelector(`.${SKILL_COPY_CLASS} > div`) ||
+        Array.from(row.querySelectorAll(".truncate")).find((node) =>
+          node instanceof HTMLElement && !node.matches(DESCRIPTION_SELECTOR) && !node.closest('.ms-auto, [class*="ms-auto"]'),
+        );
+      return (
+        row.getAttribute("data-value") ||
+        row.getAttribute("aria-label") ||
+        row.getAttribute("title") ||
+        favoriteText(titleNode) ||
+        favoriteText(row).replace(favoriteText(descriptionNode), "").trim()
+      );
+    };
+
+    const favoriteRowSnapshot = (row) => {
+      const native = nativeSlashEntry(row);
+      const descriptionNode = row.querySelector(DESCRIPTION_SELECTOR);
+      const description = native?.description || favoriteText(descriptionNode);
+      const label = native?.label || favoriteRowLabel(row);
+      const group = row.parentElement?.closest(`[${SECTION_ATTR}]`);
+      const section =
+        native?.section ||
+        normText(group?.querySelector(":scope > .sticky.top-0")) ||
+        group?.getAttribute(SECTION_ATTR) ||
+        row.getAttribute(SECTION_ATTR) ||
+        "General";
+      return {
+        label: label.slice(0, 180),
+        description: description.slice(0, 240),
+        section: section.slice(0, 100),
+        query: String(native?.query || row.getAttribute("data-value") || label).replace(/\s+/g, " ").trim().slice(0, 180),
+      };
+    };
+
+    const compactFavoriteText = (text) => String(text || "").replace(/\s+/g, "").toLowerCase();
+
+    const migrateNativeFavoriteKey = (native, favoriteKey, sectionKeys, favorites, metadata, snapshot) => {
+      if (!native?.label) return false;
+      const identity = compactFavoriteText(`${native.label} ${native.description}`);
+      const matches = Array.from(metadata, ([key, value]) => [key, value])
+        .filter(([key, value]) => favorites.has(key) && key !== favoriteKey &&
+          sectionKeys.has(key.split(":", 1)[0]) &&
+          compactFavoriteText(`${value.label} ${value.description}`) === identity);
+      if (matches.length !== 1) return false;
+      const [oldKey] = matches[0];
+      favorites.delete(oldKey);
+      favorites.add(favoriteKey);
+      metadata.delete(oldKey);
+      metadata.set(favoriteKey, snapshot);
+      return true;
+    };
+
+    const rowFavoriteKey = (button, fallbackSectionKey, refreshNative = false, metadata = null) => {
+      const native = nativeSlashEntry(button, refreshNative);
+      const nativeSection = native?.section || button.closest("[data-mention-section-id]")?.getAttribute("data-mention-section-id");
+      const section = nativeSection ? sectionKey(nativeSection) :
+        fallbackSectionKey ||
+        button.parentElement?.closest(`[${SECTION_ATTR}]`)?.getAttribute(SECTION_ATTR) ||
+        button.getAttribute(SECTION_ATTR) ||
+        "general";
+      const text = (native?.label || favoriteRowLabel(button))
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
-      return text ? `${section}:${text}` : "";
+      if (!text) return "";
+      if (!native && metadata?.size) {
+        const rowIdentity = compactFavoriteText(favoriteText(button));
+        const matches = Array.from(metadata, ([key, snapshot]) => [key, snapshot])
+          .filter(([key, snapshot]) => key.startsWith(`${section}:`) &&
+            compactFavoriteText(`${snapshot.label} ${snapshot.description}`) === rowIdentity);
+        if (matches.length === 1) return matches[0][0];
+      }
+      return `${section}:${text}`;
+    };
+
+    const legacyRowFavoriteKeys = (button) => {
+      const group = button.parentElement?.closest(`[${SECTION_ATTR}]`);
+      const heading = normText(group?.querySelector(":scope > .sticky.top-0"));
+      const section = String(heading || (group?.hasAttribute("data-mention-section-id")
+        ? "General"
+        : group?.getAttribute(SECTION_ATTR)) || "General")
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/gi, "")
+        .toLowerCase() || "general";
+      const texts = new Set([
+        normText(button),
+        favoriteText(button),
+      ].map((text) => text.replace(/\s+/g, " ").trim().toLowerCase()).filter(Boolean));
+      return Array.from(texts, (text) => `${section}:${text}`);
     };
 
     const isSlashSearchActive = () =>
@@ -6709,6 +7046,17 @@ const FEATURES = {
           return text.startsWith("/") && text.length > 1;
         },
       );
+
+    const slashSearchQuery = () => {
+      const editor = Array.from(document.querySelectorAll('.ProseMirror[contenteditable="true"]'))
+        .find((candidate) => candidate instanceof HTMLElement && normText(candidate).startsWith("/"));
+      return editor ? normText(editor).slice(1).trim().toLowerCase() : "";
+    };
+
+    const favoriteMatchesSearch = (snapshot, sourceRow, query) =>
+      !query ||
+      (sourceRow instanceof HTMLElement && sourceRow.offsetParent !== null) ||
+      String(snapshot?.query || snapshot?.label || "").toLowerCase().includes(query);
 
     const refreshFavoriteViews = () => {
       document
@@ -6724,12 +7072,19 @@ const FEATURES = {
         });
     };
 
-    const toggleFavorite = (key) => {
+    const toggleFavorite = (key, row) => {
       if (!key) return;
       const favorites = readFavorites();
-      if (favorites.has(key)) favorites.delete(key);
-      else favorites.add(key);
+      const metadata = readFavoriteMetadata();
+      if (favorites.has(key)) {
+        favorites.delete(key);
+        metadata.delete(key);
+      } else {
+        favorites.add(key);
+        if (row instanceof HTMLElement) metadata.set(key, favoriteRowSnapshot(row));
+      }
       writeFavorites(favorites);
+      writeFavoriteMetadata(metadata);
       refreshFavoriteViews();
       scheduleScan();
     };
@@ -6775,7 +7130,7 @@ const FEATURES = {
         control.addEventListener("pointerup", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          toggleFavorite(button.getAttribute(FAVORITE_KEY_ATTR) || key);
+          toggleFavorite(button.getAttribute(FAVORITE_KEY_ATTR) || key, button);
         });
         control.addEventListener("click", (event) => {
           event.preventDefault();
@@ -6814,7 +7169,7 @@ const FEATURES = {
         (node) =>
           node instanceof HTMLElement &&
           node.tagName === "SPAN" &&
-          String(node.className).includes("text-token-description-foreground"),
+          /text-token-description-foreground|text-codex-description/.test(String(node.className)),
       );
       if (!title || !description) return;
       const copy = document.createElement("div");
@@ -6831,6 +7186,337 @@ const FEATURES = {
           !row.closest(`[${FAVORITES_GROUP_ATTR}="true"]`) &&
           !row.hasAttribute(FAVORITE_CLONE_ATTR),
       );
+
+    const isPrimaryUnmodifiedEvent = (event) =>
+      event.button === 0 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.shiftKey;
+
+    const findFavoriteSource = (root, key, refresh = false) => {
+      if (refresh) nativeSlashEntryGeneration++;
+      const metadata = readFavoriteMetadata();
+      const scrollers = root.matches?.(".vertical-scroll-fade-mask")
+        ? [root]
+        : Array.from(root.querySelectorAll(".vertical-scroll-fade-mask"));
+      for (const scroller of scrollers) {
+        const source = sourceCommandRows(scroller).find((row) => rowFavoriteKey(row, undefined, false, metadata) === key);
+        if (source) return source;
+      }
+      return null;
+    };
+
+    const isPlainSlashDraft = (editor) => {
+      const text = String(editor.textContent || "");
+      if (!text.startsWith("/") || /[\r\n]/.test(text)) return false;
+      const nodes = Array.from(editor.querySelectorAll("*"));
+      return nodes.filter((node) => node.tagName === "P").length <= 1 &&
+        nodes.every((node) => node.tagName === "P" ||
+          (node.tagName === "BR" && node.className === "ProseMirror-trailingBreak"));
+    };
+
+    const writeSlashDraftText = (editor, text) => {
+      let paragraph = Array.from(editor.children).find((node) => node.tagName === "P");
+      if (!paragraph) {
+        paragraph = document.createElement("p");
+        editor.replaceChildren(paragraph);
+      }
+      paragraph.textContent = text;
+      const selection = window.getSelection?.();
+      if (!selection || typeof document.createRange !== "function") return;
+      const range = document.createRange();
+      const textNode = paragraph.firstChild;
+      if (textNode?.nodeType === 3) {
+        range.setStart(textNode, text.length);
+        range.collapse(true);
+      } else {
+        range.selectNodeContents(paragraph);
+        range.collapse(false);
+      }
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    const editorSelection = (editor) => {
+      const selection = window.getSelection?.();
+      if (!selection?.rangeCount || !editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) return null;
+      return {
+        anchorNode: selection.anchorNode,
+        anchorOffset: selection.anchorOffset,
+        focusNode: selection.focusNode,
+        focusOffset: selection.focusOffset,
+      };
+    };
+
+    const editorSelectionOffsets = (editor) => {
+      const selection = editorSelection(editor);
+      if (!selection) return null;
+      const offsetOf = (node, offset) => {
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.setEnd(node, offset);
+        return range.toString().length;
+      };
+      return {anchor: offsetOf(selection.anchorNode, selection.anchorOffset), focus: offsetOf(selection.focusNode, selection.focusOffset)};
+    };
+
+    const sameEditorSelection = (editor, expected) => {
+      const current = editorSelectionOffsets(editor);
+      if (current && expected) return current.anchor === expected.anchor && current.focus === expected.focus;
+      if (current || expected) return false;
+      const selection = window.getSelection?.();
+      return !selection?.rangeCount || !selection.anchorNode?.isConnected || editor.contains(selection.anchorNode);
+    };
+
+    const restoreEditorSelection = (editor, offsets) => {
+      if (!offsets || document.activeElement !== editor) return;
+      try {
+        const positionAt = (offset) => {
+          const walker = document.createTreeWalker(editor, 4);
+          let node = walker.nextNode();
+          let remaining = offset;
+          let last = null;
+          while (node) {
+            last = node;
+            if (remaining <= node.textContent.length) return [node, remaining];
+            remaining -= node.textContent.length;
+            node = walker.nextNode();
+          }
+          return last ? [last, last.textContent.length] : null;
+        };
+        const anchor = positionAt(offsets.anchor);
+        const focus = positionAt(offsets.focus);
+        const selection = window.getSelection?.();
+        if (anchor && focus && selection?.setBaseAndExtent) {
+          selection.setBaseAndExtent(anchor[0], anchor[1], focus[0], focus[1]);
+        }
+      } catch {
+        // Preserve the draft even when the host editor cannot restore its caret.
+      }
+    };
+
+    const waitForFavoriteSource = (root, key, editor, searchText, activation) => {
+      let resolveWait;
+      let timer;
+      let finished = false;
+      const promise = new Promise((resolve) => { resolveWait = resolve; });
+      const observer = new MutationObserver(() => {
+        if (activation.cancelled || activation.userEdited || !editor.isConnected ||
+            normText(editor) !== searchText || !activation.isUntouched()) {
+          finish(null);
+          return;
+        }
+        nativeSlashEntryGeneration++;
+        const source = findFavoriteSource(root, key);
+        if (source) finish(source);
+      });
+      const finish = (source) => {
+        if (finished) return;
+        finished = true;
+        observer.disconnect();
+        clearFavoriteActivationTimer(timer);
+        if (activation.cancelWait === cancel) activation.cancelWait = null;
+        resolveWait(source);
+      };
+      const cancel = () => finish(null);
+      activation.cancelWait = cancel;
+      observer.observe(root, { attributes: true, childList: true, subtree: true, characterData: true });
+      timer = setFavoriteActivationTimer(() => {
+        finish(editor.isConnected && normText(editor) === searchText && activation.isUntouched()
+          ? findFavoriteSource(root, key, true)
+          : null);
+      }, FAVORITE_ACTIVATION_TIMEOUT);
+      if (editor.isConnected && normText(editor) === searchText && activation.isUntouched()) {
+        const source = findFavoriteSource(root, key);
+        if (source) finish(source);
+      }
+      return promise;
+    };
+
+    const composerEditorFor = (root) => {
+      const selector = '.ProseMirror[contenteditable="true"]';
+      if (document.activeElement instanceof HTMLElement && document.activeElement.matches(selector)) {
+        return document.activeElement;
+      }
+      const local = root.querySelector(selector);
+      if (local instanceof HTMLElement) return local;
+      const overlay = root.closest('[data-composer-overlay-floating-ui="true"]');
+      const nearby = overlay?.parentElement?.querySelector(selector);
+      if (nearby instanceof HTMLElement) return nearby;
+      return Array.from(document.querySelectorAll(selector)).find((editor) =>
+        normText(editor).startsWith("/"),
+      ) || null;
+    };
+
+    const cancelFavoriteActivation = (activation, restoreDraft) => {
+      if (!activation || activation.cancelled) return;
+      const canRestore = restoreDraft && activation.isDraftUntouched();
+      activation.cancelled = true;
+      activation.cleanup();
+      if (canRestore) activation.restoreDraft();
+    };
+
+    const cancelPendingFavoriteActivation = () =>
+      cancelFavoriteActivation(pendingFavoriteActivation, true);
+
+    const activateFavoriteClone = async (scroller, key, sourceRow) => {
+      if (favoriteActivationInFlight || disposed) return false;
+      favoriteActivationInFlight = true;
+      let activation = null;
+      try {
+        const menu = scroller.closest(`[${MENU_ATTR}="true"]`);
+        const overlay = menu?.closest('[data-composer-overlay-floating-ui="true"]');
+        const root = overlay?.parentElement || overlay || menu?.parentElement || document.body;
+        if (!root) return false;
+        const metadata = readFavoriteMetadata();
+        const activate = (row) => {
+          if (!(row instanceof HTMLElement) || !row.isConnected || rowFavoriteKey(row, undefined, true, metadata) !== key) return false;
+          row.click();
+          return true;
+        };
+        if (activate(sourceRow) || activate(findFavoriteSource(root, key, true))) return true;
+        const editor = composerEditorFor(root);
+        const snapshot = metadata.get(key);
+        const query = String(snapshot?.query || snapshot?.label || "").replace(/^\/+/, "").trim();
+        if (!(editor instanceof HTMLElement) || document.activeElement !== editor || !query || !isPlainSlashDraft(editor)) return false;
+        const searchText = `/${query}`;
+        activation = {
+          editor,
+          key,
+          searchText,
+          originalContent: Array.from(editor.childNodes, (node) => node.cloneNode(true)),
+          originalSelection: editorSelectionOffsets(editor),
+          temporaryContent: null,
+          temporarySelection: null,
+          selectionChanged: false,
+          userEdited: false,
+          writingFilter: false,
+          cancelled: false,
+          cancelWait: null,
+          cleanup: () => {},
+          isDraftUntouched: () => !activation.cancelled && !activation.userEdited && editor.isConnected &&
+            normText(editor) === searchText && sameChildNodes(editor, activation.temporaryContent),
+          isUntouched: () => activation.isDraftUntouched() &&
+            sameEditorSelection(editor, activation.temporarySelection),
+          restoreDraft: () => {
+            editor.replaceChildren(...activation.originalContent);
+            editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertReplacementText" }));
+            if (!activation.selectionChanged) restoreEditorSelection(editor, activation.originalSelection);
+          },
+        };
+        activation.cleanup = () => {
+          activation.cancelWait?.();
+          editor.removeEventListener("beforeinput", activation.onUserEdit, true);
+          editor.removeEventListener("input", activation.onUserEdit, true);
+          editor.removeEventListener("keydown", activation.onUserKey, true);
+          editor.removeEventListener("blur", activation.onBlur, true);
+          document.removeEventListener("selectionchange", activation.onSelectionChange, true);
+          if (pendingFavoriteActivation === activation) pendingFavoriteActivation = null;
+        };
+        activation.onUserEdit = (event) => {
+          if (activation.writingFilter) return;
+          if (event.type === "beforeinput") {
+            cancelFavoriteActivation(activation, true);
+            return;
+          }
+          activation.userEdited = true;
+          cancelFavoriteActivation(activation, false);
+        };
+        activation.onBlur = () => {
+          if (!sameEditorSelection(editor, activation.temporarySelection)) {
+            activation.selectionChanged = true;
+          }
+          cancelFavoriteActivation(activation, true);
+        };
+        activation.onUserKey = () => cancelFavoriteActivation(activation, true);
+        activation.onSelectionChange = () => {
+          if (!sameEditorSelection(editor, activation.temporarySelection)) {
+            activation.selectionChanged = true;
+            cancelFavoriteActivation(activation, true);
+          }
+        };
+        pendingFavoriteActivation = activation;
+        editor.addEventListener("beforeinput", activation.onUserEdit, true);
+        editor.addEventListener("input", activation.onUserEdit, true);
+        editor.addEventListener("keydown", activation.onUserKey, true);
+        editor.addEventListener("blur", activation.onBlur, true);
+        document.addEventListener("selectionchange", activation.onSelectionChange, true);
+        activation.writingFilter = true;
+        try {
+          writeSlashDraftText(editor, searchText);
+          activation.temporaryContent = Array.from(editor.childNodes, (node) => node.cloneNode(true));
+          activation.temporarySelection = editorSelectionOffsets(editor);
+          editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+        } finally {
+          activation.writingFilter = false;
+        }
+        activation.temporaryContent = Array.from(editor.childNodes, (node) => node.cloneNode(true));
+        activation.temporarySelection = editorSelectionOffsets(editor);
+        const source = await waitForFavoriteSource(root, key, editor, searchText, activation);
+        if (activation.cancelled || disposed) return false;
+        if (source && activation.isUntouched()) {
+          activation.cleanup();
+          if (activate(source)) {
+            activation.cancelled = true;
+            return true;
+          }
+        }
+        if (activation.isUntouched()) {
+          activation.cleanup();
+          activation.restoreDraft();
+        } else {
+          activation.cleanup();
+        }
+        return false;
+      } catch {
+        if (activation && !activation.cancelled) {
+          if (activation.isUntouched()) {
+            activation.cleanup();
+            activation.restoreDraft();
+          } else {
+            activation.cleanup();
+          }
+        }
+        return false;
+      } finally {
+        favoriteActivationInFlight = false;
+      }
+    };
+
+    const sameChildNodes = (node, saved) =>
+      Array.isArray(saved) && node.childNodes.length === saved.length &&
+      saved.every((child, index) => node.childNodes[index].isEqualNode?.(child) || node.childNodes[index] === child);
+
+    const makeFavoriteClone = (key, sourceRow, snapshot) => {
+      if (sourceRow instanceof HTMLElement) return sourceRow.cloneNode(true);
+      const clone = document.createElement("div");
+      clone.setAttribute("data-list-navigation-item", "true");
+      clone.setAttribute("role", "option");
+      clone.setAttribute("aria-label", [snapshot.label, snapshot.description].filter(Boolean).join(", "));
+      const inner = document.createElement("div");
+      const copy = document.createElement("div");
+      copy.className = SKILL_COPY_CLASS;
+      const title = document.createElement("div");
+      title.textContent = snapshot.label;
+      copy.appendChild(title);
+      if (snapshot.description) {
+        const description = document.createElement("span");
+        description.className = "text-token-description-foreground";
+        description.textContent = snapshot.description;
+        copy.appendChild(description);
+      }
+      inner.appendChild(copy);
+      if (snapshot.section) {
+        const section = document.createElement("span");
+        section.className = "ml-auto";
+        section.textContent = snapshot.section;
+        inner.appendChild(section);
+      }
+      clone.appendChild(inner);
+      clone.setAttribute(FAVORITE_KEY_ATTR, key);
+      return clone;
+    };
 
     const syncSectionVisibility = (scroller) => {
       Array.from(scroller.children).forEach((group) => {
@@ -6893,12 +7579,26 @@ const FEATURES = {
 
     const syncFavoritesSection = (scroller) => {
       const favorites = readFavorites();
+      const metadata = readFavoriteMetadata();
+      let metadataChanged = false;
       const rowsByKey = new Map();
       sourceCommandRows(scroller).forEach((row) => {
-        const key = row.getAttribute(FAVORITE_KEY_ATTR) || rowFavoriteKey(row);
-        if (key && favorites.has(key) && !rowsByKey.has(key)) rowsByKey.set(key, row);
+        const key = rowFavoriteKey(row, undefined, false, metadata);
+        if (!key || !favorites.has(key)) return;
+        const snapshot = favoriteRowSnapshot(row);
+        if (JSON.stringify(metadata.get(key)) !== JSON.stringify(snapshot)) {
+          metadata.set(key, snapshot);
+          metadataChanged = true;
+        }
+        if (!rowsByKey.has(key)) rowsByKey.set(key, row);
       });
-      const entries = Array.from(rowsByKey.entries());
+      if (metadataChanged) writeFavoriteMetadata(metadata);
+      const query = slashSearchQuery();
+      const entries = Array.from(favorites, (key) => [key, rowsByKey.get(key) || null, metadata.get(key)])
+        .filter(([, sourceRow, snapshot]) =>
+          (sourceRow || snapshot) &&
+          favoriteMatchesSearch(snapshot, sourceRow, query),
+        );
       if (entries.length === 0) {
         removeFavoriteSection(scroller);
         return;
@@ -6915,7 +7615,9 @@ const FEATURES = {
         scroller.insertBefore(group, scroller.firstElementChild);
       }
 
-      const signature = entries.map(([key]) => key).join("|");
+      const signature = JSON.stringify(
+        entries.map(([key, , snapshot]) => [key, snapshot?.label, snapshot?.description, snapshot?.section]),
+      );
       if (group.dataset.signature === signature) return;
       group.dataset.signature = signature;
       delete scroller.dataset.codexppSlashFavoriteSelectionReady;
@@ -6924,17 +7626,17 @@ const FEATURES = {
 
       const header = document.createElement("div");
       header.className = "sticky top-0";
-      header.textContent = "Favorites";
+      header.textContent = displaySectionTitle("Favorites");
       group.appendChild(header);
 
-      entries.forEach(([key, sourceRow]) => {
-        const clone = sourceRow.cloneNode(true);
+      entries.forEach(([key, sourceRow, snapshot]) => {
+        const clone = makeFavoriteClone(key, sourceRow, snapshot);
         if (!(clone instanceof HTMLElement)) return;
         clone.setAttribute(FAVORITE_CLONE_ATTR, "true");
         clone.setAttribute(FAVORITE_KEY_ATTR, key);
         clone.setAttribute(
           FAVORITE_SOURCE_SECTION_ATTR,
-          sourceRow.getAttribute(SECTION_ATTR) || "",
+          sourceRow?.getAttribute(SECTION_ATTR) || sectionKey(snapshot?.section),
         );
         stripNativeCommandState(clone);
         clone.removeAttribute("aria-selected");
@@ -6944,19 +7646,47 @@ const FEATURES = {
             event.stopPropagation();
           });
         });
-        clone.addEventListener("click", (event) => {
-          if (event.target instanceof HTMLElement && event.target.closest(`.${FAVORITE_BUTTON_CLASS}`)) {
-            return;
-          }
+        let pointerClickPending = false;
+        let pointerClickTimer = 0;
+        const clearPointerClick = () => {
+          pointerClickPending = false;
+          clearFavoriteActivationTimer(pointerClickTimer);
+          pointerClickTimer = null;
+        };
+        clone.addEventListener("pointerdown", (event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest(`.${FAVORITE_BUTTON_CLASS}`)
+          ) return;
+          if (!isPrimaryUnmodifiedEvent(event)) return;
           event.preventDefault();
           event.stopPropagation();
-          sourceRow.click();
+          event.stopImmediatePropagation?.();
+          clearHoverScrollFreeze(scroller);
+          pointerClickPending = true;
+          pointerClickTimer = setFavoriteActivationTimer(clearPointerClick, 1000);
+          void activateFavoriteClone(scroller, key, sourceRow);
+        }, true);
+        clone.addEventListener("click", (event) => {
+          if (event.target instanceof Element && event.target.closest(`.${FAVORITE_BUTTON_CLASS}`)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation?.();
+          if (pointerClickPending) {
+            clearPointerClick();
+            return;
+          }
+          if (event.detail !== 0 || !isPrimaryUnmodifiedEvent(event)) return;
+          void activateFavoriteClone(scroller, key, sourceRow);
         });
         clone.addEventListener("keydown", (event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
           event.stopPropagation();
-          sourceRow.click();
+          event.stopImmediatePropagation?.();
+          if (event.repeat) return;
+          clearPointerClick();
+          void activateFavoriteClone(scroller, key, sourceRow);
         });
         group.appendChild(clone);
       });
@@ -7030,9 +7760,17 @@ const FEATURES = {
       const favs = favoriteRows(scroller);
       if (rows.length === 0 || favs.length === 0) return false;
 
+      if (event.key === "Enter" && event.repeat) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        return true;
+      }
+
       if (event.key === "Enter") {
         const selected = selectedNavigationRow(scroller);
         if (!(selected instanceof HTMLElement)) return false;
+        clearHoverScrollFreeze(scroller);
         scroller.dataset.codexppSlashFavoriteSelectionTouched = "true";
         event.preventDefault();
         event.stopPropagation();
@@ -7042,6 +7780,7 @@ const FEATURES = {
       }
 
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return false;
+      clearHoverScrollFreeze(scroller);
       scroller.dataset.codexppSlashFavoriteSelectionTouched = "true";
       event.preventDefault();
       event.stopPropagation();
@@ -7153,7 +7892,7 @@ const FEATURES = {
         if (!/^Skills\b/i.test(headerText)) return false;
         return Array.from(rows).some((row) =>
           row.querySelector(
-            '.text-token-description-foreground, span[class*="text-token-description-foreground"]',
+            '.text-token-description-foreground, span[class*="text-token-description-foreground"], span[class*="text-codex-description"]',
           ),
         );
       });
@@ -7175,7 +7914,7 @@ const FEATURES = {
       topbar = document.createElement("div");
       topbar.setAttribute(TOPBAR_ATTR, "true");
       topbar.innerHTML =
-        `<div ${SECTION_TITLE_ATTR}="true">General</div>` +
+        `<div ${SECTION_TITLE_ATTR}="true">${displaySectionTitle("General")}</div>` +
         '<div class="codexpp-slash-section-icons"></div>';
       menu.insertBefore(topbar, scroller);
       return topbar;
@@ -7195,6 +7934,10 @@ const FEATURES = {
     };
 
     const groupSections = (scroller) => {
+      const favorites = readFavorites();
+      const metadata = readFavoriteMetadata();
+      let favoritesChanged = false;
+      let metadataChanged = false;
       const sections = Array.from(scroller.children)
         .filter(
           (node) =>
@@ -7206,10 +7949,10 @@ const FEATURES = {
         .map((group, index) => {
           const header = group.querySelector(":scope > .sticky.top-0");
           const isFavorites = group.hasAttribute(FAVORITES_GROUP_ATTR);
-          const title = isFavorites ? "Favorites" : normText(header) || "General";
+          const nativeSection = group.getAttribute("data-mention-section-id");
+          const title = displaySectionTitle(isFavorites ? "Favorites" : nativeSection || normText(header) || "General");
           const key = sectionKey(title);
           const color = sectionColor(key, index);
-          const favorites = readFavorites();
           group.setAttribute(SECTION_ATTR, key);
           group.dataset.codexppSlashSectionTitle = title;
           group.style.setProperty("--codexpp-section-color", color);
@@ -7224,12 +7967,49 @@ const FEATURES = {
               key;
             if (visualKey === "skills") wrapSkillRow(button);
             else unwrapSkillRow(button);
-            const favoriteKey =
-              button.getAttribute(FAVORITE_KEY_ATTR) || rowFavoriteKey(button, key);
+            const favoriteClone = button.hasAttribute(FAVORITE_CLONE_ATTR);
+            const favoriteKey = favoriteClone
+              ? button.getAttribute(FAVORITE_KEY_ATTR) || rowFavoriteKey(button, key)
+              : rowFavoriteKey(button, key, false, metadata);
+            if (!favoriteClone) {
+              const native = nativeSlashEntry(button);
+              const legacySections = new Set([
+                key,
+                ...legacyRowFavoriteKeys(button).map((legacyKey) => legacyKey.split(":", 1)[0]),
+              ]);
+              if (migrateNativeFavoriteKey(
+                native,
+                favoriteKey,
+                legacySections,
+                favorites,
+                metadata,
+                favoriteRowSnapshot(button),
+              )) {
+                favoritesChanged = true;
+                metadataChanged = true;
+              }
+              legacyRowFavoriteKeys(button).forEach((legacyKey) => {
+                if (favorites.has(legacyKey) && legacyKey !== favoriteKey) {
+                  favorites.delete(legacyKey);
+                  favorites.add(favoriteKey);
+                  if (metadata.has(legacyKey)) {
+                    const oldSnapshot = metadata.get(legacyKey);
+                    metadata.delete(legacyKey);
+                    if (!metadata.has(favoriteKey)) metadata.set(favoriteKey, native?.label
+                      ? favoriteRowSnapshot(button)
+                      : oldSnapshot);
+                    metadataChanged = true;
+                  }
+                  favoritesChanged = true;
+                }
+              });
+            }
             ensureFavoriteControl(button, favoriteKey, favorites);
           });
           return { group, title, key, color };
         });
+      if (favoritesChanged) writeFavorites(favorites);
+      if (metadataChanged) writeFavoriteMetadata(metadata);
       sectionCache.set(scroller, sections);
       return sections;
     };
@@ -7237,20 +8017,32 @@ const FEATURES = {
     const renderTopbarIcons = (topbar, sections) => {
       const icons = topbar.querySelector(".codexpp-slash-section-icons");
       if (!(icons instanceof HTMLElement)) return;
-      const signature = sections.map((s) => `${s.key}:${s.title}`).join("|");
+      const uniqueSections = sections.filter(
+        (section, index) => sections.findIndex((candidate) => candidate.key === section.key) === index,
+      );
+      const signature = uniqueSections.map((s) => `${s.key}:${s.title}`).join("|");
       if (icons.dataset.signature === signature) return;
       icons.dataset.signature = signature;
       icons.replaceChildren();
-      for (const section of sections) {
+      for (const section of uniqueSections) {
         const button = document.createElement("button");
         button.type = "button";
         button.setAttribute(SECTION_ICON_ATTR, section.key);
         button.setAttribute("aria-label", section.title);
+        button.title = section.title;
         button.style.setProperty("--codexpp-section-color", section.color);
         button.innerHTML = sectionIconSvg(section.key);
+        const keepComposerFocus = (event) => {
+          if (!isPrimaryUnmodifiedEvent(event)) return;
+          event.preventDefault();
+          event.stopPropagation();
+        };
+        button.addEventListener("pointerdown", keepComposerFocus);
+        button.addEventListener("mousedown", keepComposerFocus);
         button.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (event.detail !== 0 && !isPrimaryUnmodifiedEvent(event)) return;
           const scroller = topbar.nextElementSibling;
           if (!(scroller instanceof HTMLElement)) return;
           scrollToSection(scroller, section, sections);
@@ -7419,6 +8211,7 @@ const FEATURES = {
             }
             return;
           }
+          clearHoverScrollFreeze(scroller);
           menu.setAttribute(INPUT_MODE_ATTR, "pointer");
         };
         scroller.addEventListener("pointermove", handler, { passive: true });
@@ -7474,6 +8267,7 @@ const FEATURES = {
         event.key === "PageDown" ||
         event.key === "PageUp"
       ) {
+        clearHoverScrollFreeze(scroller);
         allowSlashRowScrollIntoView();
         menu.setAttribute(INPUT_MODE_ATTR, "keyboard");
         return;
@@ -7505,6 +8299,7 @@ const FEATURES = {
 
     const scan = () => {
       scanFrame = 0;
+      nativeSlashEntryGeneration++;
       for (const scroller of scrollHandlers.keys()) {
         if (!scroller.isConnected) cleanupScroller(scroller);
       }
@@ -7575,16 +8370,19 @@ const FEATURES = {
 
     return () => {
       disposed = true;
-      observer.disconnect();
-      if (scanFrame) cancelAnimationFrame(scanFrame);
-      if (scanTimer) window.clearTimeout(scanTimer);
-      if (homePruneFrame) cancelAnimationFrame(homePruneFrame);
-      if (hardPruneTimer) window.clearTimeout(hardPruneTimer);
       document.removeEventListener("input", onComposerInput, true);
       document.removeEventListener("keyup", onComposerInput, true);
       window.removeEventListener("codexpp-slash-section-shortcut", onSectionShortcutBridge);
       window.removeEventListener("keydown", onSectionShortcut, true);
       document.removeEventListener("keydown", onSectionShortcut, true);
+      observer.disconnect();
+      cancelPendingFavoriteActivation();
+      for (const timer of favoriteActivationTimers) window.clearTimeout(timer);
+      favoriteActivationTimers.clear();
+      if (scanFrame) cancelAnimationFrame(scanFrame);
+      if (scanTimer) window.clearTimeout(scanTimer);
+      if (homePruneFrame) cancelAnimationFrame(homePruneFrame);
+      if (hardPruneTimer) window.clearTimeout(hardPruneTimer);
       for (const scroller of scrollHandlers.keys()) cleanupScroller(scroller);
       if (documentHoverGuard) {
         HOVER_GUARD_EVENTS.forEach((type) =>
@@ -8873,7 +9671,9 @@ function writeFlag(api, id, on) {
   const tweak = module.exports;
   const loaderApi = typeof api === "object" && api ? api : null;
   const baseApi = loaderApi || createBigPizzaRendererApi();
-  const rendererApi = createProjectColorCompatibleApi(baseApi);
+  const compatibleApi = createProjectColorCompatibleApi(baseApi);
+  const codexSidebar = createCodexSidebarAdapter(compatibleApi);
+  const rendererApi = Object.freeze({ ...compatibleApi, codexSidebar });
   installPinnedThreadIconStyle();
   if (!tweak || typeof tweak.start !== "function") {
     throw new Error("Better UI Imropvement entrypoint was not found");
@@ -9127,7 +9927,6 @@ function writeFlag(api, id, on) {
       const badge = root.querySelector("[data-theme-badge]");
       badge.style.cssText = `background:${draft.variants[editMode].surface};color:${draft.variants[editMode].colors[selectedColor].text}`;
       root.querySelector("[data-theme-pending]").hidden = !pending;
-      root.querySelector("[data-theme-help]").textContent = `${pending ? "当前修改仅用于预览，应用后保存。" : "修改自动保存。"}当前编辑${editMode === "dark" ? "深色" : "浅色"}的${PROJECT_THEME_COLORS[selectedColor]}，用于选择了此颜色的项目与会话。`;
     };
     const row = (label, control) => `<div class="bui-theme-row"><span class="bui-theme-label">${label}</span><div class="bui-theme-control">${control}</div></div>`;
     const colorInput = (path, value, label) => `<span class="bui-theme-color-pair">
@@ -9135,29 +9934,31 @@ function writeFlag(api, id, on) {
       <input type="text" value="${value}" data-theme-path="${path}" pattern="#[0-9a-fA-F]{6}" maxlength="7" required spellcheck="false" aria-label="${label}十六进制颜色">
     </span>`;
     const render = () => {
+      const customOpen = root.querySelector("[data-theme-custom]")?.open;
       const advancedOpen = root.querySelector("[data-theme-advanced]")?.open;
       const previewOpen = root.querySelector("[data-theme-preview-details]")?.open;
       unmountNativeChoices(root);
-      root.innerHTML = `<p class="bui-theme-scope">以下配色仅作用于 Better UI 添加的项目背景、标题 / 图标和会话着色，不修改 Codex 的主题、全局背景、字体或代码配色。</p><fieldset class="bui-theme-fieldset" aria-label="插件项目与会话配色">
-        <div class="bui-theme-card bui-theme-mode-card">${row("配色模式", '<select data-theme-mode aria-label="插件明暗模式"><option value="auto">跟随 Codex</option><option value="light">浅色</option><option value="dark">深色</option></select>')}</div>
+      root.innerHTML = `<fieldset class="bui-theme-fieldset" aria-label="插件项目与会话配色">
         <div class="bui-theme-card">
           ${row("配色预设", `<div class="bui-theme-tools"><button type="button" class="bui-theme-quiet" data-theme-action="open-import" aria-haspopup="dialog">导入</button><button type="button" class="bui-theme-quiet" data-theme-action="export">导出</button><span class="bui-theme-preset"><span data-theme-badge aria-hidden="true">Aa</span><select data-theme-preset aria-label="主题预设"><option value="codex">Codex 默认</option><option value="github">GitHub</option><option value="vscode">VS Code</option><option value="custom">自定义</option></select></span></div>`)}
+          ${row("配色模式", '<select data-theme-mode aria-label="插件明暗模式"><option value="auto">跟随 Codex</option><option value="light">浅色</option><option value="dark">深色</option></select>')}
+        </div>
+        <details class="bui-theme-details bui-theme-card" data-theme-custom ${customOpen ? "open" : ""}><summary>自定义配色</summary>
           ${row("编辑配色", '<select data-theme-edit-mode aria-label="编辑明暗配色"><option value="light">浅色</option><option value="dark">深色</option></select>')}
           ${row("项目颜色", `<select data-theme-color aria-label="编辑颜色槽位">${Object.entries(PROJECT_THEME_COLORS).map(([id, name]) => `<option value="${id}">${name}</option>`).join("")}</select>`)}
           ${Object.entries({ accent: "强调色", background: "背景", text: "前景", border: "边框" }).map(([field, label]) => row(label, colorInput(`variants.${editMode}.colors.${selectedColor}.${field}`, draft.variants[editMode].colors[selectedColor][field], `${editMode === "dark" ? "深色" : "浅色"}${label}`))).join("")}
-        </div>
-        <p class="bui-theme-help" data-theme-help></p>
-        <details class="bui-theme-details" data-theme-advanced ${advancedOpen ? "open" : ""}><summary>高级</summary><div class="bui-theme-card">
+        </details>
+        <details class="bui-theme-details bui-theme-card" data-theme-advanced ${advancedOpen ? "open" : ""}><summary>高级</summary>
           ${row("主题名称", `<input data-theme-name aria-label="主题名称" value="${escapeAttr(draft.name)}" maxlength="60" required>`)}
           ${row("预览画布底色", colorInput(`variants.${editMode}.surface`, draft.variants[editMode].surface, "预览画布底色"))}
           ${Object.entries(PROJECT_THEME_STYLE_FIELDS).filter(([key]) => key !== "stripeWidth").map(([key, [label, min, max]]) => row(label, `<input type="number" aria-label="${label}" data-theme-style="${key}" min="${min}" max="${max}" step="1" required value="${draft.styles[key]}">`)).join("")}
-        </div></details>
-        <details class="bui-theme-details" data-theme-preview-details ${previewOpen ? "open" : ""}><summary>预览</summary><div data-theme-preview aria-label="项目主题预览"></div></details>
+        </details>
+        <details class="bui-theme-details bui-theme-card" data-theme-preview-details ${previewOpen ? "open" : ""}><summary>预览</summary><div data-theme-preview aria-label="项目主题预览"></div></details>
         <div class="bui-theme-pending" data-theme-pending ${pending ? "" : "hidden"}><span>当前预览尚未应用</span><div class="bui-theme-actions"><button type="button" data-theme-action="reset">取消修改</button><button type="button" data-theme-action="save">应用主题</button></div></div>
       </fieldset>
       <div class="bui-theme-status" data-theme-status role="status" aria-live="polite"></div>
       <dialog class="bui-theme-import-dialog" aria-label="导入主题">
-        <h3>导入主题</h3><p class="bui-theme-help">选择 Better UI 主题 JSON 文件，或粘贴主题内容。导入后先预览，再应用。</p>
+        <h3>导入主题</h3><p class="bui-theme-import-warning">导入会替换当前编辑草稿；应用后才保存。</p>
         <label class="bui-theme-file">选择主题文件<input type="file" accept=".json,application/json" data-theme-file></label>
         <label class="bui-theme-json-label">主题 JSON<textarea data-theme-json rows="7" maxlength="65536" spellcheck="false" placeholder="粘贴 Better UI 导出的 JSON"></textarea></label>
         <div data-theme-import-status class="bui-theme-status" role="status"></div>
@@ -9388,12 +10189,12 @@ function writeFlag(api, id, on) {
     const groups = [
       {
         id: "usage",
-        title: "额度",
-        features: ["show-usage-in-sidebar", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
+        title: "侧栏",
+        features: ["show-usage-in-sidebar", "hide-native-usage", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
       },
       {
         id: "sidebar",
-        title: "侧栏与会话着色",
+        title: "项目配色",
         features: ["sidebar-project-backgrounds", "sidebar-conversation-colors"],
       },
       {
@@ -9402,38 +10203,26 @@ function writeFlag(api, id, on) {
         features: ["render-markdown-preview-math", "slash-menu-polish", "thread-title-regeneration", "thread-markdown-export", "thread-permanent-delete"],
       },
     ];
-    const badges = {
-      "show-usage-in-sidebar": "需额度数据",
-      "render-markdown-preview-math": "LaTeX",
-      "thread-title-regeneration": "可选模型",
-      "thread-markdown-export": "本地会话",
-      "thread-permanent-delete": "不可撤销",
-    };
     return `
-      <div class="better-ui-imropvement-ui-settings-page flex flex-col gap-10">
+      <div class="better-ui-imropvement-ui-settings-page">
         ${groups.map((group) => `
-          <section class="better-ui-imropvement-ui-settings-section flex flex-col" data-better-ui-imropvement-ui-section="${escapeAttr(group.id)}">
-            <div class="flex justify-between gap-4 min-h-toolbar items-center pb-1.5">
-              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div class="better-ui-imropvement-ui-section-title font-medium text-default text-base">${escapeHtmlLocal(group.title)}</div>
-              </div>
-            </div>
-            <div class="better-ui-imropvement-ui-settings-group flex flex-col [&>*:not(:last-child)]:relative [&>*:not(:last-child)]:after:pointer-events-none [&>*:not(:last-child)]:after:absolute [&>*:not(:last-child)]:after:inset-x-4 [&>*:not(:last-child)]:after:bottom-0 [&>*:not(:last-child)]:after:h-[0.5px] [&>*:not(:last-child)]:after:bg-border [&>*:not(:last-child)]:after:content-[''] rounded-2xl overflow-hidden border border-default">
+          <section class="better-ui-imropvement-ui-settings-section" data-better-ui-imropvement-ui-section="${escapeAttr(group.id)}">
+            <h2 class="better-ui-imropvement-ui-section-title">${escapeHtmlLocal(group.title)}</h2>
+            <div class="better-ui-imropvement-ui-settings-group">
               ${group.features.map((id) => featureInfo.find((item) => item.id === id)).filter(Boolean).map((item) => `
-                <div class="codex-plus-row better-ui-imropvement-ui-feature-row flex items-center justify-between px-4 gap-6 py-3" data-better-ui-imropvement-ui-row="${escapeAttr(item.id)}">
-                  <div class="better-ui-imropvement-ui-feature-copy flex min-w-0 flex-1 flex-col gap-0.5">
+                <div class="codex-plus-row better-ui-imropvement-ui-feature-row" data-better-ui-imropvement-ui-row="${escapeAttr(item.id)}">
+                  <div class="better-ui-imropvement-ui-feature-copy">
                     <div class="better-ui-imropvement-ui-feature-title-line">
-                      <div class="codex-plus-row-title min-w-0 text-sm text-default font-medium">${escapeHtmlLocal(item.title)}</div>
-                      ${badges[item.id] ? `<span class="better-ui-imropvement-ui-feature-badge" data-tone="${item.id === "thread-permanent-delete" ? "danger" : "neutral"}">${escapeHtmlLocal(badges[item.id])}</span>` : ""}
+                      <span class="codex-plus-row-title">${escapeHtmlLocal(item.title)}</span>
+                      ${item.id === "thread-permanent-delete" ? '<span class="better-ui-imropvement-ui-feature-warning">不可撤销</span>' : ""}
                     </div>
-                    <div class="codex-plus-row-description text-sm text-secondary">${escapeHtmlLocal(item.detail)}</div>
                     ${item.id === "thread-title-regeneration" ? `
                       <div class="better-ui-title-model-control">
-                        <label class="text-sm text-default">标题生成默认模型
+                        <label>默认模型
                           <select data-better-ui-title-model aria-label="标题生成默认模型" disabled></select>
                         </label>
-                        <div class="text-xs text-secondary" data-better-ui-title-model-status role="status"></div>
-                        <button type="button" class="text-sm text-default" data-better-ui-title-model-retry hidden>重新读取模型列表</button>
+                        <span class="better-ui-title-model-status" data-better-ui-title-model-status role="status" aria-live="polite"></span>
+                        <button type="button" data-better-ui-title-model-retry aria-label="重新读取模型列表" hidden>重试</button>
                       </div>
                     ` : ""}
                   </div>
@@ -9444,7 +10233,7 @@ function writeFlag(api, id, on) {
             ${group.id === "sidebar" ? '<div data-bui-theme-editor></div>' : ""}
           </section>
         `).join("")}
-        <div class="better-ui-imropvement-ui-settings-footer text-xs text-secondary">Better UI Imropvement · ${escapeHtmlLocal(VERSION)}</div>
+        <div class="better-ui-imropvement-ui-settings-footer">Better UI Imropvement · ${escapeHtmlLocal(VERSION)}</div>
       </div>
     `;
   }
@@ -9472,11 +10261,11 @@ function writeFlag(api, id, on) {
       select.disabled = state.status !== "ready" || state.models.length === 0;
       const control = select.closest(".better-ui-title-model-control");
       const status = control.querySelector("[data-better-ui-title-model-status]");
-      status.textContent = state.status === "loading" ? "正在从 Codex 读取模型列表…" :
+      status.textContent = state.status === "loading" ? "正在读取模型…" :
         state.status === "error" ? `读取失败：${state.error}` :
-          !available ? "所选模型当前不可用，请选择其他模型。" : "每次启动重新读取；仅用于压缩后的标题生成。";
+          !available ? "当前模型不可用，请选择其他模型。" : "";
       const retry = control.querySelector("[data-better-ui-title-model-retry]");
-      retry.hidden = state.status === "loading";
+      retry.hidden = state.status !== "error";
       mountNativeChoices(control);
     }
   }
@@ -9486,11 +10275,9 @@ function writeFlag(api, id, on) {
     const style = document.createElement("style");
     style.id = "better-ui-imropvement-ui-settings-style";
     style.textContent = `
-      [data-bui-theme-editor] { min-width: 0; margin-top: 16px; }
-      .bui-theme-scope { margin: 0 0 12px; color: var(--color-text-secondary, inherit); font-size: 12px; line-height: 1.6; }
-      .bui-theme-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-      .bui-theme-card { background: var(--color-background-panel, var(--color-background-primary-soft-alpha, color-mix(in srgb, currentColor 3%, transparent))); border: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); border-radius: 20px; overflow: hidden; }
-      .bui-theme-mode-card { margin-bottom: 16px; }
+      [data-bui-theme-editor] { min-width: 0; margin-top: 12px; }
+      .bui-theme-fieldset { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+      .bui-theme-card { background: var(--color-background-panel, var(--color-background-primary-soft-alpha, color-mix(in srgb, currentColor 3%, transparent))); border: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); border-radius: 16px; overflow: hidden; }
       .bui-theme-row { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 16px; box-sizing: border-box; }
       .bui-theme-row:not(:last-child)::after { content: ""; position: absolute; inset: auto 16px 0; height: .5px; background: var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); pointer-events: none; }
       .bui-theme-label { min-width: 0; font-size: 13px; font-weight: 500; line-height: 18px; }
@@ -9509,8 +10296,6 @@ function writeFlag(api, id, on) {
       [data-bui-theme-editor] button.bui-native-choice, .better-ui-title-model-control button.bui-native-choice { min-height: 28px; padding: 4px 10px; border: 1px solid var(--color-border, #80808040); border-radius: 999px; background: var(--color-surface, Canvas); color: inherit; font: inherit; font-size: 12px; }
       [data-bui-theme-editor] .bui-theme-preset button.bui-native-choice { border: 0; width: 143px; text-align: start; }
       [data-bui-native-choice] { display: inline-flex; min-width: 0; }
-      .better-ui-title-model-control select[hidden] { display: none !important; }
-      [data-bui-theme-editor] .bui-theme-small button { min-height: 22px; padding: 2px 10px; font-size: 11px; }
       .bui-theme-color-pair { box-sizing: border-box; display: inline-flex; height: 28px; width: 96px; align-items: center; gap: 8px; border-radius: 999px; padding: 0 8px; border: 1px solid var(--color-border, color-mix(in srgb, currentColor 10%, transparent)); }
       .bui-theme-color-pair:focus-within { outline: 2px solid var(--color-focus-ring, #58a6ff); outline-offset: 1px; }
       .bui-theme-color-pair input[type=color] { appearance: none; flex: 0 0 14px; width: 14px; height: 14px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: transparent; cursor: pointer; }
@@ -9519,11 +10304,11 @@ function writeFlag(api, id, on) {
       [data-bui-theme-editor] .bui-theme-color-pair input[type=text] { padding: 0; min-height: 0; min-width: 0; width: 100%; border: 0; border-radius: 0; background: transparent; outline: 0; text-transform: uppercase; font-size: 11px; font-variant-numeric: tabular-nums; }
       .bui-theme-row input[type=number] { width: 76px; text-align: right; }
       [data-theme-name] { width: 180px; }
-      .bui-theme-help { font-size: 12px; line-height: 1.6; color: var(--color-text-secondary, inherit); margin: 10px 0 0; }
-      .bui-theme-details { margin-top: 24px; }
-      .bui-theme-details summary { width: fit-content; cursor: pointer; color: var(--color-text-secondary, inherit); font-size: 12px; padding: 4px 0; }
-      .bui-theme-details[open] summary { margin-bottom: 12px; }
-      .bui-theme-status { min-height: 18px; margin-top: 8px; color: var(--color-text-secondary, inherit); font-size: 12px; overflow-wrap: anywhere; }
+      .bui-theme-details { margin: 0; }
+      .bui-theme-details summary { min-height: 44px; line-height: 44px; padding: 0 16px; cursor: pointer; color: var(--color-text-primary, inherit); font-size: 13px; }
+      .bui-theme-details[open] > summary { border-bottom: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); }
+      .bui-theme-status { margin-top: 8px; color: var(--color-text-secondary, inherit); font-size: 12px; overflow-wrap: anywhere; }
+      .bui-theme-status:empty { display: none; }
       .bui-theme-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; font-size: 12px; }
       [data-bui-theme-editor] [hidden] { display: none !important; }
       .bui-theme-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
@@ -9531,10 +10316,11 @@ function writeFlag(api, id, on) {
       .bui-theme-import-dialog { box-sizing: border-box; width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 40px); padding: 24px; border: 1px solid var(--color-border, #80808040); border-radius: 20px; color: var(--color-text-primary, CanvasText); background: var(--color-background-panel, Canvas); }
       .bui-theme-import-dialog::backdrop { background: #0006; }
       .bui-theme-import-dialog h3 { margin: 0; font-size: 18px; font-weight: 600; }
-      .bui-theme-file, .bui-theme-json-label { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; font-size: 12px; }
+      .bui-theme-import-warning { margin: 8px 0 0; color: var(--color-text-secondary, inherit); font-size: 13px; line-height: 1.5; }
+      .bui-theme-file, .bui-theme-json-label { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 12px; }
       [data-theme-file] { width: 100%; font-size: 12px !important; }
       [data-theme-json] { width: 100%; resize: vertical; border-radius: 10px; padding: 10px; border: 1px solid var(--color-border, #80808040); background: var(--color-surface, Canvas); font: 12px/1.5 ui-monospace, monospace !important; }
-      [data-theme-preview] { padding: 16px; border: 1px solid var(--color-border, #80808040); border-radius: 16px; max-width: 340px; }
+      [data-theme-preview] { margin: 12px 16px 16px; padding: 16px; border: 1px solid var(--color-border, #80808040); border-radius: 16px; max-width: 340px; }
       .bui-theme-preview-project { border-radius: var(--bui-theme-radius); box-shadow: inset 0 0 0 var(--bui-theme-borderWidth) var(--preview-border); background: var(--preview-bg); padding: 6px; margin-bottom: 8px; }
       .bui-theme-preview-project:hover { background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-hoverOpacity), var(--preview-bg)); }
       .bui-theme-preview-title { color: var(--preview-text); padding: 3px 5px 7px; font-size: 13px; }
@@ -9544,89 +10330,88 @@ function writeFlag(api, id, on) {
       .bui-theme-preview-thread[data-active] { background: color-mix(in srgb, var(--preview-accent) var(--bui-theme-conversationActiveOpacity), transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--preview-accent) 24%, transparent); }
       @media (max-width: 520px) { .bui-theme-row { padding-inline: 12px; gap: 8px; } .bui-theme-control { max-width: 78%; } [data-bui-theme-editor] .bui-theme-preset button.bui-native-choice { width: 100px; } }
 
-      .better-ui-title-model-control { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-      .better-ui-title-model-control label { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-      .better-ui-title-model-control select {
-        min-width: 160px; max-width: 100%; padding: 6px 10px; border-radius: 8px;
-        color: inherit; background: var(--color-background-primary, Canvas);
-        border: 1px solid var(--color-border-default, rgba(127,127,127,.28)); font: inherit;
-      }
-      .better-ui-title-model-control select:focus-visible { outline: 2px solid var(--color-chart-blue, #3b82f6); outline-offset: 2px; }
-      .better-ui-title-model-control button { align-self: flex-start; text-decoration: underline; }
-      .better-ui-title-model-control [hidden] { display: none; }
+      .better-ui-title-model-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+      .better-ui-title-model-control label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--color-text-secondary, inherit); font-size: 12px; }
+      .better-ui-title-model-control select[hidden] { display: none !important; }
+      .better-ui-title-model-control button.bui-native-choice { max-width: 240px; text-align: start; }
+      .better-ui-title-model-control button.bui-native-choice:focus-visible,
+      .better-ui-title-model-control button[data-better-ui-title-model-retry]:focus-visible { outline: 2px solid var(--color-focus-ring, #3998f6); outline-offset: 2px; }
+      .better-ui-title-model-status { color: var(--color-text-secondary, inherit); font-size: 12px; }
+      .better-ui-title-model-status:empty,
+      .better-ui-title-model-control [hidden] { display: none !important; }
+      .better-ui-title-model-control button[data-better-ui-title-model-retry] { padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-secondary, inherit); font: inherit; font-size: 12px; cursor: pointer; }
+      .better-ui-title-model-control button[data-better-ui-title-model-retry]:hover { background: var(--color-background-primary-ghost-hover, color-mix(in srgb, currentColor 7%, transparent)); }
       [data-better-ui-imropvement-ui-settings-root="true"] {
         display: block;
         width: 100%;
         color: var(--color-text-primary, var(--color-token-text-primary, #1a1c1f));
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-page {
+      .better-ui-imropvement-ui-settings-page {
         display: flex;
         flex-direction: column;
-        gap: 40px;
+        gap: 24px;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-section {
+      .better-ui-imropvement-ui-settings-section {
         display: flex;
         flex-direction: column;
+        gap: 6px;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-section-title {
+      .better-ui-imropvement-ui-section-title {
         margin: 0;
-        color: var(--color-text-primary, var(--color-token-text-primary, currentColor));
-        font-size: 13px;
+        color: var(--color-text-primary, currentColor);
+        font-size: 12px;
         font-weight: 500;
         line-height: 1.5;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-group {
+      .better-ui-imropvement-ui-settings-group {
         overflow: hidden;
         border: 1px solid var(--color-border-default, color-mix(in srgb, currentColor 8%, transparent));
-        border-radius: 20px;
+        border-radius: 16px;
         background: var(--color-background-primary, transparent);
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row {
+      .better-ui-imropvement-ui-feature-row {
+        position: relative;
+        box-sizing: border-box;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 24px;
-        padding: 12px 16px;
+        gap: 16px;
+        min-height: 44px;
+        padding: 8px 16px;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-copy {
+      .better-ui-imropvement-ui-feature-row:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        inset: auto 16px 0;
+        height: .5px;
+        background: var(--color-border-default, color-mix(in srgb, currentColor 8%, transparent));
+        pointer-events: none;
+      }
+      .better-ui-imropvement-ui-feature-copy {
         min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+        flex: 1;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-title-line {
+      .better-ui-imropvement-ui-feature-title-line {
         display: flex;
         align-items: center;
         gap: 8px;
         min-width: 0;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row-title {
+      .better-ui-imropvement-ui-feature-row .codex-plus-row-title {
         color: var(--color-text-primary, currentColor);
         font-size: 13px;
         font-weight: 500;
         line-height: 1.43;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .codex-plus-row-description {
-        margin-top: 0;
-        color: var(--color-text-secondary, var(--color-token-text-secondary, #8f96a3));
-        font-size: 13px;
-        line-height: 1.43;
-      }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-badge {
+      .better-ui-imropvement-ui-feature-warning {
         flex: 0 0 auto;
-        padding: 2px 6px;
-        border-radius: 999px;
-        background: var(--color-background-secondary, color-mix(in srgb, currentColor 7%, transparent));
-        color: var(--color-text-secondary, #737982);
-        font-size: 11px;
-        font-weight: 500;
-        line-height: 1.35;
-      }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-feature-badge[data-tone="danger"] {
-        background: color-mix(in srgb, #ef4444 10%, transparent);
         color: var(--color-text-danger, #c24141);
+        font-size: 12px;
+        font-weight: 500;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle,
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle,
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle {
         flex: 0 0 auto;
         width: 34px;
         height: 20px;
@@ -9636,10 +10421,14 @@ function writeFlag(api, id, on) {
         background: color-mix(in srgb, currentColor 18%, transparent);
         cursor: pointer;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle[data-enabled="true"] {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle[data-enabled="true"],
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle[data-enabled="true"],
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle[data-enabled="true"] {
         background: var(--color-chart-blue, #3b82f6);
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle span {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle span,
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle span,
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle span {
         display: block;
         width: 16px;
         height: 16px;
@@ -9648,11 +10437,13 @@ function writeFlag(api, id, on) {
         box-shadow: 0 1px 2px rgba(0, 0, 0, .16);
         transition: transform .15s ease;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle:focus-visible {
+      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-toggle:focus-visible,
+      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle:focus-visible,
+      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle:focus-visible {
         outline: 2px solid var(--color-focus-ring, #3998f6);
         outline-offset: 2px;
       }
-      [data-better-ui-imropvement-ui-settings-root="true"] .better-ui-imropvement-ui-settings-footer {
+      .better-ui-imropvement-ui-settings-footer {
         padding-top: 2px;
         color: var(--color-text-tertiary, var(--color-text-secondary, #8f96a3));
         font-size: 12px;
@@ -9670,52 +10461,12 @@ function writeFlag(api, id, on) {
         color: var(--color-text-primary, #f3f4f6);
       }
       .better-ui-imropvement-ui-native-settings-panel[hidden] { display: none !important; }
-      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 24px;
-        padding: 14px 16px;
-        border: 1px solid var(--color-border-default, rgba(127,127,127,.28));
-        border-bottom: 0;
-        background: var(--color-background-panel, var(--color-background-primary-soft-alpha, rgba(127,127,127,.06)));
-      }
-      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row:first-child { border-radius: 16px 16px 0 0; }
-      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row:last-child { border-bottom: 1px solid var(--color-border-default, rgba(127,127,127,.28)); border-radius: 0 0 16px 16px; }
-      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row-title { color: var(--color-text-primary, #f3f4f6) !important; font-weight: 600; }
-      .better-ui-imropvement-ui-native-settings-panel .codex-plus-row-description,
-      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-feature-status { color: var(--color-text-secondary, #a1a1aa) !important; }
-      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle {
-        flex: 0 0 auto;
-        width: 34px;
-        height: 20px;
-        padding: 2px;
-        border: 0;
-        border-radius: 999px;
-        background: color-mix(in srgb, currentColor 18%, transparent);
-        cursor: pointer;
-      }
-      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle[data-enabled="true"] { background: var(--color-chart-blue, #3b82f6); }
-      .better-ui-imropvement-ui-native-settings-panel .better-ui-imropvement-ui-toggle span { display: block; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform .15s ease; }
       [data-codex-plus-panel="betterUiImropvement"] {
         color: #f3f4f6 !important;
         color-scheme: dark;
       }
       [data-codex-plus-panel="betterUiImropvement"] .codex-plus-row-title {
         color: #f3f4f6 !important;
-      }
-      [data-codex-plus-panel="betterUiImropvement"] .codex-plus-row-description {
-        color: #a1a1aa !important;
-      }
-      .better-ui-imropvement-ui-settings-note,
-      .better-ui-imropvement-ui-feature-status {
-        margin-top: 6px;
-        color: #a1a1aa !important;
-        font-size: 12px;
-        line-height: 1.35;
-      }
-      .better-ui-imropvement-ui-feature-row[data-enabled="true"] .better-ui-imropvement-ui-feature-status {
-        color: #d1d5db !important;
       }
       .better-ui-imropvement-ui-toggle[disabled] {
         cursor: not-allowed;
@@ -9760,37 +10511,11 @@ function writeFlag(api, id, on) {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 20px;
-        padding: 14px 2px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        gap: 16px;
+        padding: 8px 16px;
       }
       #better-ui-imropvement-ui-settings-dialog .codex-plus-row-title {
         font-weight: 650;
-      }
-      #better-ui-imropvement-ui-settings-dialog .codex-plus-row-description {
-        margin-top: 4px;
-        line-height: 1.45;
-      }
-      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle {
-        flex: 0 0 auto;
-        width: 34px;
-        height: 20px;
-        padding: 2px;
-        border: 0;
-        border-radius: 999px;
-        background: #3f4652;
-        cursor: pointer;
-      }
-      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle[data-enabled="true"] {
-        background: #2fbf8f;
-      }
-      #better-ui-imropvement-ui-settings-dialog .better-ui-imropvement-ui-toggle span {
-        display: block;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: white;
-        transition: transform 0.15s ease;
       }
     `;
     document.head.appendChild(style);
@@ -9858,8 +10583,10 @@ function writeFlag(api, id, on) {
       }
       document.getElementById("better-ui-imropvement-ui-settings-style")?.remove();
       document.getElementById(PINNED_THREAD_ICON_STYLE_ID)?.remove();
-      if (typeof tweak.stop === "function") {
-        tweak.stop.call(tweak);
+      try {
+        if (typeof tweak.stop === "function") tweak.stop.call(tweak);
+      } finally {
+        codexSidebar.stop();
       }
     },
   };

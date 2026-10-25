@@ -75,7 +75,6 @@ test('theme button is independent of usage, shares hover styling and cleans up',
   let fail = false;
   const context = vm.createContext({ document: { documentElement: root, head,
     createElement: () => new Element() },
-    findSidebarSlot: () => slot,
     window: { requestAnimationFrame: fn => { pendingFrame = fn; return 1; }, cancelAnimationFrame: () => { pendingFrame = null; } },
     MutationObserver: class { constructor(callback) { this.callback = callback; observers.push(this); } observe() {} disconnect() { this.stopped = true; } },
     sessionThreadActions: { async setAppTheme(theme) { calls.push(theme); if (fail) throw Error('offline'); root.dataset.theme = theme; } },
@@ -83,7 +82,10 @@ test('theme button is independent of usage, shares hover styling and cleans up',
   vm.runInContext(source.slice(source.indexOf('function styleSidebarControl('), source.indexOf('function renderUsageBox(')), context);
   const feature = source.slice(source.indexOf('  "app-theme-toggle"(api)'), source.indexOf('  "hide-usage-alert"()'));
   const start = vm.runInContext('({' + feature + '})["app-theme-toggle"]', context);
-  const stop = start({ log: { warn: (...args) => warnings.push(args) } });
+  const stop = start({
+    codexSidebar: { ensureUsageSlot: () => slot },
+    log: { warn: (...args) => warnings.push(args) },
+  });
   const button = slot.children[0];
   assert.deepEqual(slot.children, [button], 'theme mounts with usage disabled');
   slot.appendChild(usage);
@@ -117,7 +119,7 @@ test('theme button is independent of usage, shares hover styling and cleans up',
   assert.equal(head.children.length, 0);
   assert.deepEqual(slot.children, [usage], 'disabling theme preserves usage');
   assert.ok(observers.every(observer => observer.stopped));
-  const stopAgain = start({ log: { warn() {} } });
+  const stopAgain = start({ codexSidebar: { ensureUsageSlot: () => slot }, log: { warn() {} } });
   assert.equal(slot.children.length, 2);
   stopAgain();
   assert.deepEqual(slot.children, [usage]);

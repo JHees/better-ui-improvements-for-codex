@@ -55,13 +55,14 @@ test('new sidebar rows use their bound native conversation ID after persistence'
   row.fiber = null;
   assert.equal(find(row)?.threadId, id);
 });
-test('native service discovery follows both initial and shared entry modules', async () => {
+test('native service discovery includes a split primary bundle from modulepreload links', async () => {
   const script = {src:'app://-/assets/index-new.js'};
+  const primary = {href:'app://-/assets/app-primary-new.js'};
   const functions = source.slice(source.indexOf('  function localModuleUrl('), source.indexOf('  function resolverFromModule('));
-  const context = vm.createContext({ URL, document:{baseURI:'app://-/index.html',querySelectorAll:()=>[script]}, performance:{getEntriesByType:()=>[]},
+  const context = vm.createContext({ URL, document:{baseURI:'app://-/index.html',querySelectorAll:selector=>selector==='script[src]'?[script]:selector==='link[rel="modulepreload"][href]'?[primary]:[]}, performance:{getEntriesByType:()=>[]},
     fetch:async()=>({ok:true,text:async()=>'import "./app-shared-new.js"; import "./app-initial-new.js";'}) });
   vm.runInContext(functions, context);
-  assert.deepEqual(Array.from(await context.discoverAppInitialUrls()).sort(), ['app://-/assets/app-initial-new.js','app://-/assets/app-shared-new.js']);
+  assert.deepEqual(Array.from(await context.discoverAppInitialUrls()).sort(), ['app://-/assets/app-initial-new.js','app://-/assets/app-primary-new.js','app://-/assets/app-shared-new.js']);
 });
 test('thread menu discovery reaches the expanded native sidebar hook list', () => {
   const ref = {current:()=> 'native-menu'};
