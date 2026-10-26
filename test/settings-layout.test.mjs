@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
-const source = await readFile(path.join(repositoryRoot, "scripts/better-ui-imropvement.js"), "utf8");
+const source = (await readFile(path.join(repositoryRoot, "scripts/better-ui-imropvement.js"), "utf8")).replace(/\r\n/g, "\n");
 const definitionsSource = source.match(
   /const FEATURE_DEFINITIONS = Object\.freeze\((\[[\s\S]*?\])\);\s*const FEATURE_IDS/u,
 );
@@ -37,7 +37,13 @@ test("settings render an accessible switch for every feature", () => {
     const id = tag.match(/data-better-ui-imropvement-ui-feature="([^"]+)"/u)?.[1];
     assert.equal(tag.match(/aria-label="([^"]+)"/u)?.[1], titles.get(id));
     assert.match(tag, /aria-checked="false"/u);
+    const hint = features.find(item => item.id === id).hint;
+    if (hint) {
+      assert.ok(tag.includes(`aria-describedby="bui-help-${id}"`));
+      assert.ok(html.includes(`id="bui-help-${id}" class="better-ui-imropvement-ui-feature-hint">${hint}</div>`));
+    } else assert.doesNotMatch(tag, /aria-describedby/u);
   }
+  assert.equal(features.filter(item => item.hint).length, 7, "only options needing context have a short explanation");
   assert.deepEqual(
     [...html.matchAll(/<h2 class="better-ui-imropvement-ui-section-title">([^<]+)<\/h2>/gu)].map(([, title]) => title),
     ["侧栏", "项目配色", "编辑与会话"],
@@ -76,8 +82,11 @@ test("palette shortcuts stay visible and custom, advanced, preview, and import c
   assert.match(themeEditor, /导入会替换当前编辑草稿；应用后才保存/u);
   assert.match(
     themeEditor,
-    /pending = true;\s*render\(\);\s*root\.querySelector\("\[data-theme-preview-details\]"\)\.open = true;/u,
+    /pending = true;\s*render\(\);\s*root\.querySelector\("\[data-theme-custom\]"\)\.open = true;\s*root\.querySelector\("\[data-theme-preview-details\]"\)\.open = true;/u,
   );
+  assert.match(themeEditor, /bui-theme-editor-grid/u);
+  assert.match(themeEditor, /<summary>布局与名称<\/summary>/u);
+  assert.match(themeEditor, /<summary>粘贴主题内容<\/summary>/u);
 });
 
 test("title model status is quiet when ready and retry appears only on errors", () => {

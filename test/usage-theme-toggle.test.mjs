@@ -37,6 +37,46 @@ test('legacy layout still uses a confirmed bottom toolbar without a floating pla
   assert.equal(context.findSlot(), toolbar);
 });
 
+test('saved credit selection survives startup without credit data and later refreshes', () => {
+  let saved = 'points';
+  const start = source.indexOf('  const BASE_ORDER =', source.indexOf('function renderUsageBox('));
+  const end = source.indexOf('  const btn =', start);
+  const initialize = () => vm.runInNewContext(`${source.slice(start, end)}\n({syncOrder, selected: () => kind})`, {
+    snapshot: { points: null }, api: { storage: { get: () => saved, set: (_, value) => { saved = value; } } },
+  });
+  const state = initialize();
+  assert.equal(state.selected(), 'points');
+  assert.equal(saved, 'points');
+  state.syncOrder({ points: { value: 12 } });
+  state.syncOrder({ points: null });
+  assert.equal(state.selected(), 'points');
+  assert.equal(initialize().selected(), 'points', 'next instance restores the same selection');
+  saved = 'unknown';
+  assert.equal(initialize().selected(), '5h');
+  assert.equal(saved, '5h');
+});
+
+test('usage reconnect reuses its control and does not wait for quota requests', () => {
+  const feature = source.slice(source.indexOf('  "show-usage-in-sidebar"(api)'));
+  const extract = name => feature.match(new RegExp(`    const ${name} = \\([\\s\\S]*?\\n    \\};`))[0];
+  let slot = null, appended = 0, refreshed = 0, scheduled = 0;
+  const button = { isConnected: false, _refresh: () => refreshed++, remove: () => { throw Error('control recreated'); } };
+  const context = vm.createContext({ disposed: false, mounted: button, lastMountedMode: 'navigation-rail',
+    displaySnapshot: () => ({}), api: { codexSidebar: { ensureUsageSlot: () => slot } },
+    document: { querySelectorAll: () => [] }, log() {},
+    window: { setTimeout: () => ++scheduled }, runMutationScan: () => { throw Error('network awaited'); },
+  });
+  vm.runInContext(`let scheduled = false, scheduleTimer = 0;\n${extract('ensureMounted')}\n${extract('onMutate')}\nglobalThis.reconnect = onMutate;`, context);
+  context.reconnect();
+  assert.equal(context.mounted, button, 'temporary missing rail retains the instance');
+  slot = { dataset: { codexppUsageSlot: 'navigation-rail' }, contains: () => false,
+    appendChild(node) { assert.equal(node, button); appended++; node.isConnected = true; } };
+  context.reconnect();
+  assert.equal(appended, 1);
+  assert.equal(refreshed, 1);
+  assert.equal(scheduled, 1, 'network scans remain coalesced');
+});
+
 test('theme changes use native persisted settings with validation', async () => {
   const calls = [], setting = { key: 'appearanceTheme' }, scope = {};
   async function write(scope, setting, theme, options) {
@@ -112,8 +152,9 @@ test('theme button is independent of usage, shares hover styling and cleans up',
   assert.match(button.title, /切换失败/);
   assert.equal(warnings.length, 1);
   button.remove(); slot = new Element(); slot.appendChild(usage);
-  observers[0].callback(); pendingFrame(); observers[0].callback();
+  observers[0].callback(); observers[0].callback();
   assert.deepEqual(slot.children, [button, usage]);
+  assert.equal(pendingFrame, null, 'reconnect happens before the next paint');
   stop();
   assert.equal(button.parentElement, null);
   assert.equal(head.children.length, 0);

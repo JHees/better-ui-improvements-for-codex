@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.4.25";
+  const VERSION = "1.5.0";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -33,6 +33,7 @@
     {
       id: "hide-upgrade-prompts",
       title: "隐藏升级提示",
+      hint: "隐藏套餐促销，保留软件更新通知。",
       detail: "隐藏套餐升级提示，保留 Codex 软件更新通知。",
       defaultEnabled: true,
       status: "可用",
@@ -40,6 +41,7 @@
     {
       id: "show-usage-in-sidebar",
       title: "侧栏额度显示",
+      hint: "点击切换 5 小时、每周和点数；记住上次选择。",
       detail: "在侧栏显示 5 小时和每周额度；点击额度可切换周期，有 Credit 数据时一并显示。",
       defaultEnabled: true,
       status: "当前页面暴露额度信号时可用",
@@ -47,6 +49,7 @@
     {
       id: "hide-native-usage",
       title: "隐藏原生额度按钮",
+      hint: "仅隐藏 Codex 自带的“用量”入口。",
       detail: "隐藏 Codex 26.1021 侧栏底部的原生“用量”按钮；Better UI 的额度显示不受影响。",
       defaultEnabled: true,
       status: "可用",
@@ -82,6 +85,7 @@
     {
       id: "render-markdown-preview-math",
       title: "公式与图片预览",
+      hint: "补充 Markdown 预览中的公式和本地图片。",
       detail: "在 .md 预览中补充 LaTeX 和本地图片渲染；表格、链接与排版继续使用 Codex 原生能力。",
       defaultEnabled: true,
       status: "支持 $…$、$$…$$、\\(…\\) 和 \\[…\\]",
@@ -89,6 +93,7 @@
     {
       id: "slash-menu-polish",
       title: "斜杠菜单优化",
+      hint: "紧凑分组、收藏常用项，支持键盘快速选择。",
       detail: "收紧斜杠菜单间距，并突出当前选项。",
       defaultEnabled: true,
       status: "可用",
@@ -96,6 +101,7 @@
     {
       id: "thread-title-regeneration",
       title: "会话标题重新生成",
+      hint: "先在临时分支压缩会话，再生成标题；原会话内容不变。",
       detail: "在临时分支中压缩完整会话，再由所选模型根据压缩上下文重新生成标题。",
       defaultEnabled: true,
       status: "本地普通会话可用；不会修改原会话上下文",
@@ -103,6 +109,7 @@
     {
       id: "thread-markdown-export",
       title: "会话 Markdown 导出",
+      hint: "导出用户和助手消息，不含工具数据。",
       detail: "在会话右键菜单中导出用户与助手消息，不包含工具数据或隐藏上下文。",
       defaultEnabled: true,
       status: "本地普通会话可用；直接使用 Codex 原生 App Server",
@@ -2559,7 +2566,7 @@ function createSidebarSlotFinder() {
     };
 
     const findSidebarSlot = () => {
-      const navigation = document.querySelector('aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
+      const navigation = document.querySelector('nav[data-app-navigation-rail], aside.app-shell-left-panel nav[class~="group/sidebar-rail"]');
       // A hidden or unfinished modern rail is not a legacy sidebar.
       if (navigation || document.querySelector("aside.app-shell-left-panel")) {
         if (!navigation || !isVisibleElement(navigation)) return null;
@@ -5302,15 +5309,6 @@ const FEATURES = {
       const visibleSnapshot = displaySnapshot();
       const slot = api.codexSidebar.ensureUsageSlot();
       if (!slot) {
-        if (mounted) {
-          mounted.remove();
-          mounted = null;
-        }
-        for (const stale of document.querySelectorAll(
-          '[data-codexpp="usage-box"], [data-codexpp="usage-boxes"]',
-        )) {
-          stale.remove();
-        }
         if (!ensureMounted._warned) {
           log("ensureMounted: no sidebar slot found yet");
           if (typeof reportLifecycle === "function") {
@@ -5332,12 +5330,13 @@ const FEATURES = {
         if (stale !== mounted) stale.remove();
       }
 
-      if (mounted && slot.contains(mounted) && !forceRebuild) {
+      const compact = slot.dataset.codexppUsageSlot === "navigation-rail";
+      if (mounted && (lastMountedMode === "navigation-rail") === compact && !forceRebuild) {
+        if (!slot.contains(mounted)) slot.appendChild(mounted);
         mounted._refresh?.(visibleSnapshot);
         return;
       }
       if (mounted) mounted.remove();
-      const compact = slot.dataset.codexppUsageSlot === "navigation-rail";
       mounted = renderUsageBox(api, visibleSnapshot, compact);
       mounted.dataset.codexpp = "usage-box";
       slot.appendChild(mounted);
@@ -5379,6 +5378,8 @@ const FEATURES = {
       ensureMounted();
     };
     const onMutate = () => {
+      // Restore React-replaced rail controls before paint, independently of network refreshes.
+      if (!mounted?.isConnected) ensureMounted();
       if (scheduled) return;
       scheduled = true;
       scheduleTimer = window.setTimeout(() => {
@@ -5451,7 +5452,7 @@ const FEATURES = {
     };
     const refresh = () => {
       const slot = api.codexSidebar.ensureUsageSlot();
-      if (!slot) { button.remove(); return; }
+      if (!slot) return;
       if (button.parentElement !== slot) {
         const previousSlot = button.parentElement;
         slot.insertBefore(button, slot.firstChild);
@@ -5476,9 +5477,8 @@ const FEATURES = {
     const style = document.createElement("style");
     style.textContent = '[data-codexpp="usage-slot"]:has(> [data-codexpp="app-theme-toggle"]) { flex-direction: column; gap: 4px; }';
     document.head.appendChild(style);
-    let frame = 0;
     const layoutObserver = new MutationObserver(() => {
-      if (!button.isConnected && !frame) frame = window.requestAnimationFrame(() => { frame = 0; refresh(); });
+      if (!button.isConnected) refresh();
     });
     layoutObserver.observe(document.documentElement, { childList: true, subtree: true });
     const themeObserver = new MutationObserver(render);
@@ -5488,7 +5488,6 @@ const FEATURES = {
       disposed = true;
       layoutObserver.disconnect();
       themeObserver.disconnect();
-      if (frame) window.cancelAnimationFrame(frame);
       const slot = button.parentElement;
       button.remove();
       if (slot && !slot.children.length) slot.remove();
@@ -9494,7 +9493,7 @@ function renderUsageBox(api, snapshot, compact = false) {
       String(snap.points.value).trim() !== ""
     );
     order = hasPoints ? [...BASE_ORDER, "points"] : BASE_ORDER;
-    if (!order.includes(kind)) {
+    if (![...BASE_ORDER, "points"].includes(kind)) {
       kind = "5h";
       api.storage.set("usage:visible-kind", kind);
     }
@@ -9811,7 +9810,7 @@ function writeFlag(api, id, on) {
       id: "main",
       title: "界面增强",
       description: "",
-      iconSvg: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-sm inline-block align-middle" aria-hidden="true"><path d="M10 2.5 11.4 8.6 17.5 10l-6.1 1.4L10 17.5l-1.4-6.1L2.5 10l6.1-1.4L10 2.5Z" fill="currentColor"/></svg>',
+      iconSvg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" class="icon-sm inline-block align-middle" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M9 9h12"/></svg>',
       render(root) {
         root.dataset.betterUiImropvementUiSettingsRoot = "true";
         root.innerHTML = settingsPanelHtml();
@@ -9936,7 +9935,7 @@ function writeFlag(api, id, on) {
     const render = () => {
       const customOpen = root.querySelector("[data-theme-custom]")?.open;
       const advancedOpen = root.querySelector("[data-theme-advanced]")?.open;
-      const previewOpen = root.querySelector("[data-theme-preview-details]")?.open;
+      const previewOpen = root.querySelector("[data-theme-preview-details]")?.open ?? true;
       unmountNativeChoices(root);
       root.innerHTML = `<fieldset class="bui-theme-fieldset" aria-label="插件项目与会话配色">
         <div class="bui-theme-card">
@@ -9944,23 +9943,24 @@ function writeFlag(api, id, on) {
           ${row("配色模式", '<select data-theme-mode aria-label="插件明暗模式"><option value="auto">跟随 Codex</option><option value="light">浅色</option><option value="dark">深色</option></select>')}
         </div>
         <details class="bui-theme-details bui-theme-card" data-theme-custom ${customOpen ? "open" : ""}><summary>自定义配色</summary>
+          <div class="bui-theme-editor-grid"><div class="bui-theme-fields">
           ${row("编辑配色", '<select data-theme-edit-mode aria-label="编辑明暗配色"><option value="light">浅色</option><option value="dark">深色</option></select>')}
           ${row("项目颜色", `<select data-theme-color aria-label="编辑颜色槽位">${Object.entries(PROJECT_THEME_COLORS).map(([id, name]) => `<option value="${id}">${name}</option>`).join("")}</select>`)}
           ${Object.entries({ accent: "强调色", background: "背景", text: "前景", border: "边框" }).map(([field, label]) => row(label, colorInput(`variants.${editMode}.colors.${selectedColor}.${field}`, draft.variants[editMode].colors[selectedColor][field], `${editMode === "dark" ? "深色" : "浅色"}${label}`))).join("")}
-        </details>
-        <details class="bui-theme-details bui-theme-card" data-theme-advanced ${advancedOpen ? "open" : ""}><summary>高级</summary>
+        <details class="bui-theme-details bui-theme-advanced" data-theme-advanced ${advancedOpen ? "open" : ""}><summary>布局与名称</summary>
           ${row("主题名称", `<input data-theme-name aria-label="主题名称" value="${escapeAttr(draft.name)}" maxlength="60" required>`)}
           ${row("预览画布底色", colorInput(`variants.${editMode}.surface`, draft.variants[editMode].surface, "预览画布底色"))}
           ${Object.entries(PROJECT_THEME_STYLE_FIELDS).filter(([key]) => key !== "stripeWidth").map(([key, [label, min, max]]) => row(label, `<input type="number" aria-label="${label}" data-theme-style="${key}" min="${min}" max="${max}" step="1" required value="${draft.styles[key]}">`)).join("")}
         </details>
-        <details class="bui-theme-details bui-theme-card" data-theme-preview-details ${previewOpen ? "open" : ""}><summary>预览</summary><div data-theme-preview aria-label="项目主题预览"></div></details>
+          </div><details class="bui-theme-details bui-theme-preview-pane" data-theme-preview-details ${previewOpen ? "open" : ""}><summary>预览</summary><div data-theme-preview aria-label="项目主题预览"></div></details></div>
+        </details>
         <div class="bui-theme-pending" data-theme-pending ${pending ? "" : "hidden"}><span>当前预览尚未应用</span><div class="bui-theme-actions"><button type="button" data-theme-action="reset">取消修改</button><button type="button" data-theme-action="save">应用主题</button></div></div>
       </fieldset>
       <div class="bui-theme-status" data-theme-status role="status" aria-live="polite"></div>
       <dialog class="bui-theme-import-dialog" aria-label="导入主题">
         <h3>导入主题</h3><p class="bui-theme-import-warning">导入会替换当前编辑草稿；应用后才保存。</p>
         <label class="bui-theme-file">选择主题文件<input type="file" accept=".json,application/json" data-theme-file></label>
-        <label class="bui-theme-json-label">主题 JSON<textarea data-theme-json rows="7" maxlength="65536" spellcheck="false" placeholder="粘贴 Better UI 导出的 JSON"></textarea></label>
+        <details class="bui-theme-paste"><summary>粘贴主题内容</summary><label class="bui-theme-json-label"><textarea data-theme-json aria-label="主题内容" rows="7" maxlength="65536" spellcheck="false" placeholder="粘贴 Better UI 导出的主题内容"></textarea></label></details>
         <div data-theme-import-status class="bui-theme-status" role="status"></div>
         <div class="bui-theme-actions"><button type="button" data-theme-action="close-import">取消</button><button type="button" data-theme-action="import">导入并预览</button></div>
       </dialog>`;
@@ -9996,6 +9996,7 @@ function writeFlag(api, id, on) {
       draft = imported;
       pending = true;
       render();
+      root.querySelector("[data-theme-custom]").open = true;
       root.querySelector("[data-theme-preview-details]").open = true;
       message("导入成功。检查预览后点击“应用主题”。");
     };
@@ -10216,6 +10217,7 @@ function writeFlag(api, id, on) {
                       <span class="codex-plus-row-title">${escapeHtmlLocal(item.title)}</span>
                       ${item.id === "thread-permanent-delete" ? '<span class="better-ui-imropvement-ui-feature-warning">不可撤销</span>' : ""}
                     </div>
+                    ${item.hint ? `<div id="bui-help-${escapeAttr(item.id)}" class="better-ui-imropvement-ui-feature-hint">${escapeHtmlLocal(item.hint)}</div>` : ""}
                     ${item.id === "thread-title-regeneration" ? `
                       <div class="better-ui-title-model-control">
                         <label>默认模型
@@ -10226,7 +10228,7 @@ function writeFlag(api, id, on) {
                       </div>
                     ` : ""}
                   </div>
-                  <button type="button" role="switch" aria-label="${escapeAttr(item.title)}" aria-checked="false" class="codex-plus-toggle better-ui-imropvement-ui-toggle" data-better-ui-imropvement-ui-feature="${escapeAttr(item.id)}" ${item.disabled ? "disabled" : ""}><span></span></button>
+                  <button type="button" role="switch" aria-label="${escapeAttr(item.title)}" ${item.hint ? `aria-describedby="bui-help-${escapeAttr(item.id)}"` : ""} aria-checked="false" class="codex-plus-toggle better-ui-imropvement-ui-toggle" data-better-ui-imropvement-ui-feature="${escapeAttr(item.id)}" ${item.disabled ? "disabled" : ""}><span></span></button>
                 </div>
               `).join("")}
             </div>
@@ -10276,6 +10278,7 @@ function writeFlag(api, id, on) {
     style.id = "better-ui-imropvement-ui-settings-style";
     style.textContent = `
       [data-bui-theme-editor] { min-width: 0; margin-top: 12px; }
+      .better-ui-imropvement-ui-feature-hint { margin-top: 4px; color: var(--color-text-secondary, inherit); font-size: 12px; line-height: 1.5; }
       .bui-theme-fieldset { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
       .bui-theme-card { background: var(--color-background-panel, var(--color-background-primary-soft-alpha, color-mix(in srgb, currentColor 3%, transparent))); border: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); border-radius: 16px; overflow: hidden; }
       .bui-theme-row { position: relative; display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 16px; box-sizing: border-box; }
@@ -10307,6 +10310,15 @@ function writeFlag(api, id, on) {
       .bui-theme-details { margin: 0; }
       .bui-theme-details summary { min-height: 44px; line-height: 44px; padding: 0 16px; cursor: pointer; color: var(--color-text-primary, inherit); font-size: 13px; }
       .bui-theme-details[open] > summary { border-bottom: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); }
+      .bui-theme-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, .85fr); gap: 12px; padding: 12px; }
+      .bui-theme-fields { min-width: 0; }
+      .bui-theme-fields .bui-theme-row { padding-inline: 4px; }
+      .bui-theme-advanced { border-top: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); }
+      .bui-theme-advanced > summary { padding-inline: 4px; }
+      .bui-theme-preview-pane { align-self: start; position: sticky; top: 12px; border: 1px solid var(--color-border, color-mix(in srgb, currentColor 8%, transparent)); border-radius: 10px; overflow: hidden; }
+      .bui-theme-paste { margin-top: 12px; }
+      .bui-theme-paste > summary { cursor: pointer; font-size: 13px; padding-block: 8px; }
+      @media (max-width: 1100px) { .bui-theme-editor-grid { grid-template-columns: minmax(0, 1fr); } .bui-theme-preview-pane { position: static; } }
       .bui-theme-status { margin-top: 8px; color: var(--color-text-secondary, inherit); font-size: 12px; overflow-wrap: anywhere; }
       .bui-theme-status:empty { display: none; }
       .bui-theme-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; font-size: 12px; }
