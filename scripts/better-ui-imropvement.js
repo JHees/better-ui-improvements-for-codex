@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.0";
+  const VERSION = "1.5.1";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -4684,7 +4684,7 @@ const FEATURES = {
       );
     };
 
-    const nativeHttpClientModuleUrls = () => {
+    const nativeHttpClientModuleUrls = async () => {
       const urls = new Set();
       const add = (value) => {
         if (!value) return;
@@ -4694,7 +4694,7 @@ const FEATURES = {
         } catch {
           return;
         }
-        if (/\/assets\/app-(?:initial|shared)-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
+        if (/\/assets\/app-(?:initial|primary|shared)-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
       };
       document.querySelectorAll("script[src], link[href]").forEach((node) => {
         add(node.src || node.href);
@@ -4702,6 +4702,27 @@ const FEATURES = {
       try {
         performance.getEntriesByType("resource").forEach((entry) => add(entry.name));
       } catch {}
+      // Resource timing can be cleared; Codex's fetch wrapper also rejects app: URLs.
+      const entries = [...document.querySelectorAll("script[src]")].map((node) => node.src);
+      const visited = new Set();
+      for (const entry of entries) {
+        const url = new URL(entry, window.location.href);
+        if (url.host !== new URL(window.location.href).host || url.protocol !== "app:" || visited.has(url.href)) continue;
+        visited.add(url.href);
+        const text = await new Promise((resolve) => {
+          const request = new XMLHttpRequest();
+          request.open("GET", url.href);
+          request.timeout = 5_000;
+          request.onload = () => resolve(request.status === 200 ? request.responseText : "");
+          request.onerror = request.ontimeout = () => resolve("");
+          request.send();
+        });
+        for (const match of text.matchAll(/(?:\.\/|\/)?(?:assets\/)?app-(?:main|initial|primary|shared)-[A-Za-z0-9_-]+\.js/g)) {
+          const dependency = new URL(match[0], url).href;
+          if (/\/app-main-/.test(dependency)) entries.push(dependency);
+          else add(dependency);
+        }
+      }
       return [...urls];
     };
 
@@ -4711,7 +4732,7 @@ const FEATURES = {
         const candidates = [];
         const seen = new Set();
         let lastError = null;
-        for (const moduleUrl of nativeHttpClientModuleUrls()) {
+        for (const moduleUrl of await nativeHttpClientModuleUrls()) {
           try {
             const nativeModule = await import(moduleUrl);
             for (const value of Object.values(nativeModule)) {
