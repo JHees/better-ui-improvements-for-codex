@@ -13,6 +13,12 @@
 
 </div>
 
+![Better UI: project colors, usage and Markdown previews](docs/images/cover.png)
+
+[Watch the ~15-second visual tour](docs/images/quick-tour.gif) · A slideshow of screenshots and illustrations, not a live recording.
+
+[Download](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [Install](#install) · [Contribute](CONTRIBUTING.md)
+
 Better UI Imropvement 1.5.1 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
 Version 1.5.1 restores sidebar quota retrieval when Codex loads its HTTP client through an intermediate entry module and resource timing records are unavailable. See the [release notes](docs/RELEASE-1.5.1.md).
@@ -34,23 +40,19 @@ Version 1.5.1 restores sidebar quota retrieval when Codex loads its HTTP client 
 
 ## Install
 
-### Codex Script Loader
+**Download the ready-made package. No Node.js, Git, or build step is needed.** These steps target Windows. The macOS Loader has not been hardware-tested; see [platform support](https://github.com/JHees/codex-script-loader#platform-support).
 
-This plugin is released independently from [Codex Script Loader](https://github.com/JHees/codex-script-loader). It is not bundled with, mirrored into, versioned by, or deployed from the Loader repository.
+1. Download `windows-x64-setup.exe` from the [latest Loader release](https://github.com/JHees/codex-script-loader/releases/latest), or `windows-arm64-setup.exe` for Windows on Arm. Save your work and close Codex before the initial installation, then start it through the **Codex Script Loader** shortcut.
+2. Open the [latest Better UI release](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest). Under **Assets**, download `better-ui-imropvement-<version>.zip`. Do not choose GitHub's **Source code** archives. The `.sha256` file is a checksum, not the plugin.
+3. In **Codex Settings → Script-Loader**, use plugin management to install a ZIP. Select the downloaded file, review the package name and permissions, then install and enable it. Keep the ZIP compressed.
+4. Open **Interface enhancements** and choose the features you want. Project colors or the sidebar usage control provide a visible starting point; usage requires available account data.
 
-Run `npm test` and `npm run check`, then create an installable ZIP with:
+**Update or disable:** Check for plugin updates in Loader; automatic updates are opt-in. Use Interface enhancements to turn individual features off, or disable the entire plugin in Loader. If a package with the previous plugin identity is still installed, remove that old package before installing this one.
 
-```powershell
-npm run package
-```
+For help, open an [issue](https://github.com/JHees/better-ui-improvements-for-codex/issues) with your Codex, Loader and Better UI versions and an anonymized screenshot. The old Codex++ Script Market build stopped at `1.2.4`; current packages are not compatible with Codex++.
 
-Install the resulting `dist/better-ui-imropvement-<version>.zip` from the Loader settings page. For development, the repository root is also a valid package folder because [`manifest.json`](manifest.json) points to the canonical [`scripts/better-ui-imropvement.js`](scripts/better-ui-imropvement.js). All source, manifest, tests, versions, and releases are owned by this repository.
-
-The package command also creates `dist/better-ui-imropvement-<version>.zip.sha256`. Tagged stable releases publish both files. Packages using the previous identity must be removed before installing this independently identified plugin. Automatic replacement remains an opt-in setting; checking for updates does not enable it.
-
-### Legacy Codex++ installations
-
-Codex++ users may continue using the market's frozen `1.2.4` build, but it is unsupported and will not receive updates from this repository. Do not install a newer repository build into Codex++ and do not submit newer releases to its Script Market.
+<details>
+<summary>Full feature list and defaults</summary>
 
 ## Features
 
@@ -70,7 +72,12 @@ Codex++ users may continue using the market's frozen `1.2.4` build, but it is un
 
 Feature switches are available under **Codex Settings → Script-Loader → Interface enhancements**. Preferences are stored locally and survive script reloads. Version 1.4.11 restores quota retrieval through Codex's renderer HTTP service and suppresses the redundant leading chat icon on pinned sidebar rows. The plugin-defined settings page continues to use the current Codex settings layout, typography, cards, controls, and scroll surface. Title regeneration keeps its system-scoped temporary working fork, waits for a newly completed native compaction turn, and suppresses only the matching temporary-thread notification. Markdown tables, links, and layout remain delegated to Codex's native preview, and project-color choices continue to migrate from the legacy Codex++ storage namespace to the Script Loader namespace.
 
+</details>
+
 ### Project palette and themes
+
+![Project palette and feature controls](docs/images/settings-overview.png)
+
 
 Under **Interface enhancements → Sidebar and conversation colors**, choose a Codex default, GitHub, or VS Code inspired preset. Presets only style Better UI's project backgrounds, titles/icons and conversation coloring; they do not change Codex's theme, global background, fonts or code palette. Follow Codex's light/dark mode or select a fixed mode.
 
@@ -85,6 +92,11 @@ Conversation colors use Codex's stable project ID for both local and cloud conve
 
 ## Native thread context actions
 
+![Illustrative thread actions: titles, Markdown export and deletion](docs/images/thread-actions.png)
+
+This is a feature illustration with example titles and filenames, not a recording of real operations.
+
+
 - **Move to project** and **Remove from project** remain Codex-native operations. Better UI Imropvement does not duplicate or replace them.
 - **Title generation default model** is selectable beneath the title-regeneration switch. The plugin reads Codex’s visible model list on every startup/reload and saves your selection locally. It prefers `low` reasoning when supported, otherwise the model’s default. The choice only affects title generation after compaction. Loading failures offer a retry; unavailable selections remain saved and require choosing an available model.
 - **Regenerate title** creates a system-scoped temporary working fork, runs Codex's native compaction, and asks the selected model (initial default: `gpt-5.4-mini`) for a structured title in the same compacted context. The working fork is permanently deleted afterwards; the source thread is never compacted or given an extra message.
@@ -94,6 +106,10 @@ Conversation colors use Codex's stable project ID for both local and cloud conve
 - These actions call the local Codex App Server directly and do not require the Codex++ session-delete bridge or helper service.
 
 ## Conversation project colors
+
+![Anonymized project and conversation colors](docs/images/projects-demo.png)
+
+Project and conversation names are anonymized; the underlying data was not changed.
 
 - Standalone conversation rows inherit their project's color in the normal sidebar and limited-filter results. Rows inside a project share its enclosing color frame without individual coloring.
 - The display uses a soft rounded background, a stronger hover tint, and a thin inset outline for the selected row. There is no leading stripe; titles and unread indicators retain their native styling.
@@ -112,6 +128,10 @@ Current Codex builds own conversation discovery, grouping, and pagination. Bette
 
 ## Usage-data behavior
 
+![Usage and theme controls — illustrative values](docs/images/usage-example.png)
+
+The cards above are explanatory illustrations, not the actual sidebar layout; usage values are examples, not account data.
+
 - The widget waits for the current layout's anchor before appearing, without first mounting in a temporary legacy position. Legacy bottom controls remain supported.
 - **Settings → Script-Loader → UI Improvements → Usage** includes an independent app theme button switch. The button stays available with usage disabled and uses the same hover styling as the compact usage control. It saves Codex's native appearance preference.
 
@@ -124,6 +144,9 @@ Current Codex builds own conversation discovery, grouping, and pagination. Bette
 - The standalone `market-hide-usage-alert.js` script is no longer needed because that behavior is built in.
 
 ## Quota-prompt filtering
+
+![Independent sidebar and notification switches](docs/images/settings-overview.png)
+
 
 - Hides Codex quota-exhaustion notices and upgrade prompts while keeping conversation content, the composer, and app-update notices visible.
 - Works in both the main Codex interface and embedded ChatGPT views.
@@ -149,6 +172,22 @@ Better UI Imropvement runs through Codex Script Loader and does not modify the o
 ## Optional companion script
 
 [`scripts/hidden-user-message-visibility-fix.js`](scripts/hidden-user-message-visibility-fix.js) is an independent compatibility fix for user messages hidden by conversation compaction or steering-rendering issues. It is not part of the Better UI Imropvement core script.
+
+## Development and contributions
+
+For normal use, download the release package above. Development requires Node.js 22+; ZIP packaging also requires PowerShell 7.
+
+```powershell
+git clone https://github.com/JHees/better-ui-improvements-for-codex.git
+cd better-ui-improvements-for-codex
+npm run check
+npm test
+npm run package
+```
+
+Output: `dist/better-ui-imropvement-<version>.zip` and its `.sha256`. For development, Loader can also install the repository folder; `manifest.json` declares its entry point. This plugin is packaged and released independently; Loader installs and runs it.
+
+Feedback, translations, screenshots and focused fixes are welcome. Start with the [contribution guide](CONTRIBUTING.md).
 
 ## Credits and license
 

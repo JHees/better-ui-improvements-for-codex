@@ -13,6 +13,12 @@
 
 </div>
 
+![Better UI：项目配色、额度和 Markdown 预览](docs/images/cover.png)
+
+[观看约 15 秒图文演示](docs/images/quick-tour.gif) · 截图与示意图轮播，非实时操作录像。
+
+[下载安装包](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [安装步骤](#安装) · [参与贡献](CONTRIBUTING.zh-CN.md)
+
 Better UI Imropvement 1.5.1 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
 1.5.1 修复 Codex 通过中间入口模块加载请求客户端、且资源记录不可用时，侧栏额度一直显示“—”的问题。详见[版本更新说明](docs/RELEASE-1.5.1.md)。
@@ -34,23 +40,19 @@ Better UI Imropvement 1.5.1 是适用于 [Codex Script Loader](https://github.co
 
 ## 安装
 
-### 通过 Codex Script Loader
+**普通用户直接下载安装包，无需 Node.js、Git 或自行打包。** 以下步骤面向 Windows；macOS Loader 尚未经硬件验证，见 [Loader 平台说明](https://github.com/JHees/codex-script-loader#platform-support)。
 
-本插件独立于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 发布。Loader 仓库不再内置、镜像、版本化或部署本插件。
+1. 从 [Loader 最新发布页](https://github.com/JHees/codex-script-loader/releases/latest) 下载 `windows-x64-setup.exe` 安装器；Windows on Arm 设备选择 `windows-arm64-setup.exe`。首次安装前保存工作并退出 Codex，安装后通过 **Codex Script Loader** 快捷方式启动。
+2. 打开 [Better UI 最新发布页](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest)，在 **Assets** 中下载 `better-ui-imropvement-<版本>.zip`。不要选择 GitHub 自动生成的 **Source code** 压缩包；`.sha256` 是校验文件，不是插件。
+3. 在 **Codex 设置 → Script-Loader** 的插件管理中选择安装 ZIP，选中下载的文件，核对插件名称及权限后安装并启用。无需解压。
+4. 打开 **界面增强** 设置页，选择需要的功能。看到项目配色或侧栏额度控件，即可开始使用；额度需要当前账号提供可用数据。
 
-先运行 `npm test` 和 `npm run check`，再生成可安装 ZIP：
+**更新与关闭：** 在 Loader 中检查插件更新；自动更新需要单独开启。关闭某项功能用“界面增强”开关；停用整个插件用 Loader 的禁用操作。若仍装着旧身份的插件包，先在 Loader 中移除旧包，再安装当前包。
 
-```powershell
-npm run package
-```
+遇到问题，请附上 Codex、Loader、Better UI 版本和匿名截图，到 [Issues](https://github.com/JHees/better-ui-improvements-for-codex/issues) 反馈。旧 Codex++ Script Market 的 `1.2.4` 为最后支持版，当前插件不能安装到 Codex++。
 
-在 Loader 设置页安装生成的 `dist/better-ui-imropvement-<version>.zip`。开发时也可以直接选择本仓库根目录作为插件包，因为 [`manifest.json`](manifest.json) 会指向唯一主源码 [`scripts/better-ui-imropvement.js`](scripts/better-ui-imropvement.js)。源码、清单、测试、版本与发布全部由本仓库独立维护。
-
-打包命令还会生成 `dist/better-ui-imropvement-<version>.zip.sha256`，稳定版 tag 会同时发布这两个文件。使用旧身份的插件包需要先移除，再安装这个具有独立身份的插件。自动替换仍需用户单独开启；检查更新本身不会开启自动更新。
-
-### 旧版 Codex++ 安装
-
-Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停止支持，也不会再从本仓库获得更新。请勿把更新版本安装到 Codex++，也不要把新版本提交到其 Script Market。
+<details>
+<summary>完整功能与默认行为</summary>
 
 ## 功能清单
 
@@ -70,7 +72,12 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 
 所有功能开关都位于 **Codex 设置 → Script-Loader → 界面增强**。设置保存在本地，重新加载脚本不会覆盖用户选择。1.4.11 恢复了通过 Codex renderer HTTP 服务获取额度，并隐藏了置顶会话行中重复出现的前置会话图标。插件声明的设置页继续复用当前 Codex 设置页的布局、字体、卡片、控件和滚动容器。标题生成继续使用 system 来源的临时工作分支，只接受本次新增且已完成的原生压缩 turn，并只屏蔽精确匹配临时分支的完成通知。Markdown 表格、链接和排版仍交由 Codex 原生预览，项目颜色偏好会从旧版 Codex++ 存储命名空间迁移到 Script Loader 命名空间。
 
+</details>
+
 ### 项目配色与主题
+
+![项目配色与独立功能开关](docs/images/settings-overview.png)
+
 
 在 **界面增强 → 侧栏与会话着色** 中选择 Codex 默认、GitHub 或 VS Code 风格预设；这些预设仅调整 Better UI 添加的项目背景、标题 / 图标和会话着色，不修改 Codex 自身主题、全局背景、字体或代码配色。明暗模式可跟随 Codex，或固定为浅色 / 深色。
 
@@ -85,6 +92,11 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 
 ## 原生会话右键操作
 
+![会话标题、Markdown 导出与删除功能示例](docs/images/thread-actions.png)
+
+上图为功能示意，标题和文件名为示例；不是真实操作记录。
+
+
 - **移动到项目**和**移出项目**继续使用 Codex 原生实现，Better UI Imropvement 不重复添加或替换。
 - **标题生成默认模型**位于标题重新生成开关下方。插件每次启动或热重载都会读取 Codex 的可见模型列表，并在本地保存选择。支持时优先使用 `low` 推理强度，否则使用模型声明的默认强度。选择仅影响压缩后的标题生成。读取失败时可以重试；已保存模型不可用时会保留偏好并提示重新选择。
 - **重新生成标题**会创建 system 来源的临时工作分支，在该分支上触发 Codex 原生压缩，再让所选模型（初始默认 `gpt-5.4-mini`） 在同一压缩上下文中生成结构化标题；结束后永久删除工作分支，原会话不会被压缩或追加消息。
@@ -94,6 +106,10 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 - 三项功能直接调用本地 Codex App Server，不依赖 Codex++ 会话删除 bridge 或 helper 服务。
 
 ## 会话项目着色
+
+![匿名项目与会话配色示例](docs/images/projects-demo.png)
+
+项目与会话名称已替换为示例文字，未修改真实数据。
 
 - 普通侧栏及有限筛选结果中单独显示的会话，会继承所属项目的颜色；项目内条目共用整个项目的颜色框，不另行着色。
 - 使用淡色圆角背景，悬停时稍加深，选中时增加细边缘提示；不再显示左侧色条，标题和未读提示保持原生样式。
@@ -112,6 +128,10 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 
 ## 额度数据规则
 
+![额度视图与主题功能示意](docs/images/usage-example.png)
+
+上图是说明用的卡片排版，数值为示例，不是实际侧栏布局或账号额度。
+
 - 控件等待当前布局的目标位置就绪后直接显示，不再先显示在旧版临时位置；仍支持旧版底栏控件布局。
 - **设置 → Script-Loader → 界面增强 → 额度** 提供独立的明暗主题按钮开关。关闭额度显示后按钮仍可使用，与紧凑额度控件共用悬停样式，并保存 Codex 原生外观偏好。
 
@@ -124,6 +144,9 @@ Codex++ 用户仍可继续使用市场中冻结的 `1.2.4`，但该版本已停�
 - `market-hide-usage-alert.js` 的功能已经内置，不再需要单独安装。
 
 ## 额度提示过滤
+
+![侧栏与提示的独立开关](docs/images/settings-overview.png)
+
 
 - 隐藏 Codex 额度耗尽提示和升级提示，同时保留会话正文、输入框及软件更新提示。
 - 支持 Codex 主界面和内嵌 ChatGPT 页面中的相关提示。
@@ -149,6 +172,22 @@ Better UI Imropvement 通过 Codex Script Loader 运行，不会修改 Codex 官
 ## 可选附加脚本
 
 [`scripts/hidden-user-message-visibility-fix.js`](scripts/hidden-user-message-visibility-fix.js) 是独立的兼容性修复，用于恢复因会话压缩或 steering 渲染异常而被隐藏的用户消息，不属于 Better UI Imropvement 主脚本。
+
+## 开发与贡献
+
+普通使用请下载上面的发布包。只有修改插件时才需要 Node.js 22+；生成 ZIP 还需要 PowerShell 7。
+
+```powershell
+git clone https://github.com/JHees/better-ui-improvements-for-codex.git
+cd better-ui-improvements-for-codex
+npm run check
+npm test
+npm run package
+```
+
+输出为 `dist/better-ui-imropvement-<版本>.zip` 及其 `.sha256`。开发时也可通过 Loader 安装仓库文件夹；入口由 `manifest.json` 指定。插件独立打包和发布，Loader 只负责安装与运行。
+
+欢迎反馈、翻译、截图和小型修复。开始前阅读[贡献指南](CONTRIBUTING.zh-CN.md)。
 
 ## 来源与许可
 
