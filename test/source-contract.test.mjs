@@ -13,7 +13,7 @@ const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workfl
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.5.1");
+  assert.equal(manifest.version, "1.5.2");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -55,7 +55,7 @@ test("current renderer compatibility behavior remains covered in this repository
   assert.match(source, /thread-permanent-delete/u);
   assert.match(source, /nativeHttpClientModuleUrls/u);
   assert.match(source, /app-initial-/u);
-  assert.match(source, /typeof value\.safeGet !== "function"/u);
+  assert.match(source, /nativeHttpClientsFromModule/u);
   assert.match(source, /return await fetchWithNativeHttpClient\(url\)/u);
   assert.match(source, /data-app-action-sidebar-thread-pinned="true"\] \.icon-leading-slot/u);
   assert.match(source, /PINNED_THREAD_ICON_STYLE_ID/u);

@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.5.1-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.2-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -19,12 +19,12 @@
 
 [Download](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [Install](#install) · [Contribute](CONTRIBUTING.md)
 
-Better UI Imropvement 1.5.1 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.5.2 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.5.1 restores sidebar quota retrieval when Codex loads its HTTP client through an intermediate entry module and resource timing records are unavailable. See the [release notes](docs/RELEASE-1.5.1.md).
+Version 1.5.2 restores quota retrieval in Rspack-based Codex builds and makes client discovery less sensitive to entry filenames, export names and minified code. Failed client caches are refreshed automatically. See the [release notes](docs/RELEASE-1.5.2.md).
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.5.1`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.5.2`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 

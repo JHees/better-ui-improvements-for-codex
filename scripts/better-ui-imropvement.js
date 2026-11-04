@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.1";
+  const VERSION = "1.5.2";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -4688,19 +4688,18 @@ const FEATURES = {
       const urls = new Set();
       const add = (value) => {
         if (!value) return;
-        let url = "";
         try {
-          url = new URL(String(value), window.location.href).href;
+          const url = new URL(String(value), window.location.href);
+          if (url.protocol === "app:" && url.host === new URL(window.location.href).host && /\.m?js$/i.test(url.pathname)) urls.add(url.href);
         } catch {
           return;
         }
-        if (/\/assets\/app-(?:initial|primary|shared)-[^/?]+\.js(?:[?#]|$)/i.test(url)) urls.add(url);
       };
-      document.querySelectorAll("script[src], link[href]").forEach((node) => {
+      document.querySelectorAll('script[src], link[rel="modulepreload"][href]').forEach((node) => {
         add(node.src || node.href);
       });
       try {
-        performance.getEntriesByType("resource").forEach((entry) => add(entry.name));
+        performance.getEntriesByType("resource").filter((entry) => entry.initiatorType === "script").forEach((entry) => add(entry.name));
       } catch {}
       // Resource timing can be cleared; Codex's fetch wrapper also rejects app: URLs.
       const entries = [...document.querySelectorAll("script[src]")].map((node) => node.src);
@@ -4709,6 +4708,9 @@ const FEATURES = {
         const url = new URL(entry, window.location.href);
         if (url.host !== new URL(window.location.href).host || url.protocol !== "app:" || visited.has(url.href)) continue;
         visited.add(url.href);
+        if (!/\.m?js$/i.test(url.pathname)) continue;
+        urls.add(url.href);
+        if (!/\/(?:index|app-main)-/.test(url.pathname)) continue;
         const text = await new Promise((resolve) => {
           const request = new XMLHttpRequest();
           request.open("GET", url.href);
@@ -4726,6 +4728,44 @@ const FEATURES = {
       return [...urls];
     };
 
+    const nativeHttpClientsFromModule = (nativeModule) => {
+      const candidates = new Set();
+      const modules = [nativeModule];
+      const hasMethod = (value, name) => {
+        for (let current = value; current && current !== Object.prototype; current = Object.getPrototypeOf(current)) {
+          const descriptor = Object.getOwnPropertyDescriptor(current, name);
+          if (descriptor) return typeof descriptor.value === "function";
+        }
+        return false;
+      };
+      const inspected = new Set();
+      for (const mod of modules) {
+        if (!mod || inspected.has(mod)) continue;
+        inspected.add(mod);
+        try {
+          if (hasMethod(mod, "safeGet") && hasMethod(mod, "makeRequest")) candidates.add(mod);
+        } catch {}
+        for (const key of Object.keys(mod)) {
+          try {
+            const value = mod[key];
+            if (!value || (typeof value !== "object" && typeof value !== "function")) continue;
+            // RPC proxies fabricate methods on property access; require real method descriptors.
+            if (hasMethod(value, "safeGet") && hasMethod(value, "makeRequest")) candidates.add(value);
+            if (typeof value !== "function") continue;
+            const cache = Object.getOwnPropertyDescriptor(value, "c")?.value;
+            const factories = Object.getOwnPropertyDescriptor(value, "m")?.value;
+            if (!cache || typeof cache !== "object" || !factories || typeof factories !== "object") continue;
+            // Read cached exports without running factories or depending on their minified source.
+            for (const record of Object.values(cache)) {
+              const exports = record && Object.getOwnPropertyDescriptor(record, "exports")?.value;
+              if (exports) modules.push(exports);
+            }
+          } catch {}
+        }
+      }
+      return [...candidates];
+    };
+
     const resolveNativeHttpClientCandidates = async () => {
       if (nativeHttpClientCandidatesPromise) return nativeHttpClientCandidatesPromise;
       nativeHttpClientCandidatesPromise = (async () => {
@@ -4735,15 +4775,8 @@ const FEATURES = {
         for (const moduleUrl of await nativeHttpClientModuleUrls()) {
           try {
             const nativeModule = await import(moduleUrl);
-            for (const value of Object.values(nativeModule)) {
-              if (
-                !value ||
-                (typeof value !== "object" && typeof value !== "function") ||
-                typeof value.safeGet !== "function" ||
-                seen.has(value)
-              ) {
-                continue;
-              }
+            for (const value of nativeHttpClientsFromModule(nativeModule)) {
+              if (seen.has(value)) continue;
               seen.add(value);
               candidates.push(value);
             }
@@ -4766,6 +4799,7 @@ const FEATURES = {
 
     const fetchWithNativeHttpClient = async (url) => {
       let lastError = null;
+      const previousClient = nativeHttpClient;
       if (nativeHttpClient) {
         try {
           return await nativeHttpClient.safeGet(url);
@@ -4775,6 +4809,7 @@ const FEATURES = {
         }
       }
       for (const candidate of await resolveNativeHttpClientCandidates()) {
+        if (candidate === previousClient) continue;
         try {
           const result = await candidate.safeGet(url);
           nativeHttpClient = candidate;
@@ -4783,6 +4818,7 @@ const FEATURES = {
           lastError = error;
         }
       }
+      nativeHttpClientCandidatesPromise = null;
       throw lastError || new Error("Codex native HTTP request failed");
     };
 
