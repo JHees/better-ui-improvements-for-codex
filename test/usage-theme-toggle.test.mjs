@@ -77,13 +77,13 @@ test('usage reconnect reuses its control and does not wait for quota requests', 
   assert.equal(scheduled, 1, 'network scans remain coalesced');
 });
 
-test('theme changes use native persisted settings with validation', async () => {
+test('legacy theme writer forwards validated settings arguments', async () => {
   const calls = [], setting = { key: 'appearanceTheme' }, scope = {};
   async function write(scope, setting, theme, options) {
     // Native discovery markers: .query.snapshot( configuredValues: optimistic
     calls.push({ scope, setting, theme, options });
   }
-  const context = vm.createContext({ nativeScopeElement: () => ({}), scopeFromRow: () => scope,
+  const context = vm.createContext({ document: {querySelectorAll: () => []}, nativeScopeElement: () => ({}), scopeFromRow: () => scope,
     loadAppInitialModules: async () => [{ preferences: { theme: setting }, write }] });
   const method = source.slice(source.indexOf('    async setAppTheme('), source.indexOf('    async listTitleModels('));
   const actions = vm.runInContext('({' + method + '})', context);
@@ -92,6 +92,25 @@ test('theme changes use native persisted settings with validation', async () => 
   assert.deepEqual(calls.map(call => call.theme), ['dark', 'light']);
   assert.ok(calls.every(call => call.scope === scope && call.setting === setting && call.options.optimistic === false));
   await assert.rejects(actions.setAppTheme('invalid'), /Invalid app theme/);
+});
+
+test('current theme service writes before legacy sidebar discovery and propagates native rejection', async () => {
+  const calls = [], failure = Error('native write failed');
+  const settings = {async write(key, value) {
+    assert.equal(this, settings);
+    calls.push([key, value]);
+    if (value === 'light') throw failure;
+  }};
+  const runtime = {__webpack_require__: {c: {changedId: {exports: {appServices: {settings}}}}}};
+  const method = source.slice(source.indexOf('    async setAppTheme('), source.indexOf('    async listTitleModels(')).replace('import(url)', 'loadModule(url)');
+  const actions = vm.runInNewContext('({' + method + '})', {
+    document: {querySelectorAll: () => [{src: 'app://-/assets/entry.js'}]}, localModuleUrl: url => url,
+    loadModule: async () => runtime, nativeScopeElement: () => {throw Error('sidebar must not be required');},
+  });
+  await actions.setAppTheme('dark');
+  await assert.rejects(actions.setAppTheme('light'), error => error === failure);
+  await assert.rejects(actions.setAppTheme('invalid'), /Invalid app theme/);
+  assert.deepEqual(calls, [['appearanceTheme','dark'], ['appearanceTheme','light']]);
 });
 
 test('theme button is independent of usage, shares hover styling and cleans up', async () => {

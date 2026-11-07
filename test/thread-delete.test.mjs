@@ -50,7 +50,7 @@ test('delete opens the native confirmation with the exact target and never sends
   const context = {row, hostId: 'local', threadId: 'target-id', threadKey: 'local:target-id'};
   const globals = {
     SESSION_ACTION_DELETE: 'delete', inFlight: new Set(), operationEpoch: 0,
-    scopeFromRow: () => scope,
+    currentAppModules: async () => [], scopeFromRow: () => scope,
     loadNativeDeleteRuntime: async () => ({openModal: (...args) => calls.push(args), DeleteThreadDialog: component, React: {createElement: (type, props, child) => ({type, props, child})}}),
     labels: () => ({unavailable: 'unavailable'}), log() {}, showToast: message => errors.push(message),
   };
@@ -117,4 +117,25 @@ test('background deletion stays pending until the native request settles and rep
     await sandbox.deleteThreadInBackground(context, scope, 0);
     assert.equal(requests.length, 1, 'a stopped confirmation must not start deletion');
   }
+});
+
+test('current native deletion skips opaque exports and keeps confirmation in the native opener', async () => {
+  const calls=[], errors=[], scope={}, row={};
+  function opaque() {}
+  async function open(scope, identity, options) {
+    // DeleteThreadDialog returnFocusTo .threadId
+    calls.push({scope,identity,options});
+  }
+  const sandbox=vm.createContext({
+    SESSION_ACTION_DELETE:'delete',inFlight:new Set(),operationEpoch:0,
+    currentAppModules:async()=>[{opaque,open}],scopeFromRow:()=>scope,
+    loadNativeDeleteRuntime:()=>{throw Error('legacy path used');},
+    labels:()=>({unavailable:'unavailable'}),log(){},showToast:error=>errors.push(error),opaque,
+  });
+  vm.runInContext("const original=Function.prototype.toString; Function.prototype.toString=function(){if(this===opaque)throw Error('opaque export');return original.call(this)}",sandbox);
+  vm.runInContext(extract('  async function openNativeDeleteDialog(', '  function start()'),sandbox);
+  await sandbox.openNativeDeleteDialog({row,hostId:'local',threadId:'fixture',threadKey:'local:fixture'});
+  assert.equal(calls.length,1);assert.equal(calls[0].scope,scope);
+  assert.equal(calls[0].identity.threadId,'fixture');assert.equal(calls[0].options.returnFocusTo,row);
+  assert.deepEqual(errors,[]);assert.equal(sandbox.inFlight.size,0);
 });

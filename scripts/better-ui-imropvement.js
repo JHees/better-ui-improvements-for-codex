@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.2";
+  const VERSION = "1.5.3";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -390,6 +390,44 @@ const SESSION_ACTION_REGENERATE_TITLE = "regenerate-title";
 const SESSION_ACTION_EXPORT = "export";
 const SESSION_ACTION_DELETE = "delete";
 const sessionThreadActions = createSessionThreadActionsManager();
+
+async function currentAppRuntimes() {
+  const runtimes = new Set();
+  for (const element of document.querySelectorAll('script[type="module"][src]')) {
+    const url = new URL(element.src, document.baseURI);
+    if (url.protocol !== "app:" || url.host !== new URL(document.baseURI).host) continue;
+    const module = await import(url.href);
+    for (const value of Object.values(module)) {
+      if (typeof value === "function" && value.c && value.m) runtimes.add(value);
+    }
+  }
+  return [...runtimes];
+}
+
+async function currentAppModules() {
+  const modules = new Set();
+  for (const runtime of await currentAppRuntimes()) {
+    for (const record of Object.values(runtime.c)) {
+      const exports = Object.getOwnPropertyDescriptor(record, "exports")?.value;
+      if (exports && (typeof exports === "object" || typeof exports === "function")) modules.add(exports);
+    }
+  }
+  return [...modules];
+}
+
+async function currentNativeKatex() {
+  for (const runtime of await currentAppRuntimes()) {
+    for (const [id, factory] of Object.entries(runtime.m)) {
+      const source = Function.prototype.toString.call(factory);
+      if (!source.includes("renderToString") || !source.includes("ParseError")) continue;
+      const module = runtime(id);
+      const values = [module, ...Object.values(module ?? {})];
+      const katex = values.find(value => typeof value?.renderToString === "function" && typeof value?.render === "function");
+      if (katex) return katex;
+    }
+  }
+  return null;
+}
 
 function createTitleModelSettings({ storage, loadModels, onChange, setTimer, clearTimer }) {
   const storageKey = "title-generation:model";
@@ -1149,7 +1187,8 @@ function createSessionThreadActionsManager() {
   async function loadAppInitialModules() {
     if (!appInitialModulesPromise) {
       appInitialModulesPromise = (async () => {
-        const modules = [];
+        const modules = await currentAppModules();
+        if (modules.length) return modules;
         let lastError = null;
         for (const url of await discoverAppInitialUrls()) {
           try {
@@ -2006,6 +2045,19 @@ function createSessionThreadActionsManager() {
     try {
       const scope = scopeFromRow(context.row);
       if (!scope) throw new Error(labels().unavailable);
+      for (const module of await currentAppModules()) {
+        const open = Object.values(module).find(value => {
+          if (typeof value !== "function") return false;
+          try {
+            const source = Function.prototype.toString.call(value);
+            return source.includes("DeleteThreadDialog") && source.includes("returnFocusTo") && source.includes(".threadId");
+          } catch { return false; }
+        });
+        if (open) {
+          if (epoch === operationEpoch) await open(scope, {hostId: context.hostId, threadId: context.threadId}, {returnFocusTo: context.row});
+          return;
+        }
+      }
       const { openModal, DeleteThreadDialog, React } = await loadNativeDeleteRuntime();
       if (epoch !== operationEpoch) return;
       const Confirmation = backgroundDeleteConfirmation(React, DeleteThreadDialog,
@@ -2123,6 +2175,18 @@ function createSessionThreadActionsManager() {
   return {
     async setAppTheme(theme) {
       if (!["light", "dark"].includes(theme)) throw new Error("Invalid app theme");
+      // Current Codex exposes the native settings service in its loaded module runtime.
+      for (const script of document.querySelectorAll('script[type="module"][src]')) {
+        const url = localModuleUrl(script.src);
+        if (!url) continue;
+        const cache = (await import(url)).__webpack_require__?.c;
+        if (!cache) continue;
+        for (const entry of Object.values(cache)) {
+          if (!Object.hasOwn(entry.exports ?? {}, "appServices")) continue;
+          const settings = entry.exports.appServices?.settings;
+          if (typeof settings?.write === "function") return await settings.write("appearanceTheme", theme);
+        }
+      }
       const row = nativeScopeElement();
       const scope = row && scopeFromRow(row);
       if (!scope) throw new Error("Codex settings are not ready");
@@ -3490,9 +3554,11 @@ const FEATURES = {
         katexPromise = Promise.resolve(window.katex);
         return katexPromise;
       }
-      katexPromise = discoverKatexUrl()
-        .then((url) => import(url))
-        .then((module) => module?.default || module)
+      katexPromise = currentNativeKatex().then(async (current) => {
+        if (current) return current;
+        const module = await import(await discoverKatexUrl());
+        return module?.default || module;
+      })
         .then((katex) => {
           if (typeof katex?.renderToString !== "function") {
             throw new Error("Codex KaTeX module has no renderToString export");
@@ -3673,6 +3739,13 @@ const FEATURES = {
     async function loadNativeCodeMirror(view) {
       if (!codeMirrorPromise) {
         codeMirrorPromise = (async () => {
+          for (const module of await currentAppModules()) {
+            const exports = Object.values(module);
+            if (!exports.includes(view.constructor)) continue;
+            const decoration = exports.find(value => typeof value?.mark === "function"
+              && typeof value?.replace === "function" && typeof value?.set === "function");
+            if (decoration) return decoration;
+          }
           const mainUrl = await currentMainModuleUrl();
           if (!mainUrl) return null;
           const source = await fetch(mainUrl).then((response) => response.text());
