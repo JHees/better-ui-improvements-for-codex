@@ -123,3 +123,52 @@ test("a prose-only preview can discover its runtime without existing decorations
   assert.equal(runtime.PrecExtension, Priority);
   assert.equal(fallbackCalls, 1);
 });
+
+test("table wrappers include native replacement boundaries and deduplicate viewport marks", () => {
+  const marks = [], output = [];
+  const runtime = {
+    view: { constructor: { outerDecorations: { of: callback => callback } } },
+    Decoration: {
+      mark: spec => { marks.push(spec); return {range: (from, to) => ({from, to, spec})}; },
+      set: ranges => { output.push(...ranges); return ranges; },
+    },
+  };
+  const context = vm.createContext({});
+  vm.runInContext(source.slice(source.indexOf("    function createTableCellExtension("), source.indexOf("    function createMathExtension(")), context);
+  const decorate = context.createTableCellExtension(runtime);
+  const decorations = { between: (_from, _to, visit) => {
+    visit(1, 6, {spec: {class: "cm-markdown-table-cell"}});
+    visit(1, 6, {spec: {class: "cm-markdown-table-cell"}});
+    visit(7, 10, {spec: {class: "other"}});
+  } };
+  decorate({state: {doc: {length: 10}}, plugins: [{value: {decorations}}, {value: {}}]});
+  assert.equal(output.length, 1);
+  assert.equal(marks[0].inclusive, true, "a replacement spanning the whole cell must remain inside it");
+  assert.match(marks[0].class, /better-ui-imropvement-preview-table-cell/);
+  assert.match(source, /\.better-ui-imropvement-preview-table-cell \.cm-markdown-table-cell\s*\{\s*display: contents;/);
+  assert.equal(context.createTableCellExtension({...runtime, view: {constructor: {}}}).length, 0);
+});
+
+test("native math owns its ranges while unsupported formulas keep the plugin fallback", () => {
+  const text = String.raw`\(n\) and $x$`;
+  const field = {};
+  const nativeDecorations = {between: (_from, _to, visit) => visit(0, 5)};
+  const nativeValue = {focused: true, allDecorations: nativeDecorations, decorations: {between() {}}};
+  const state = {doc: {toString: () => text}, sliceDoc: (from, to) => text.slice(from, to),
+    field: () => nativeValue, config: {fields: [field]}};
+  const runtime = {view: {state}, StateField: {define: spec => spec}, DecorationsFacet: {},
+    Decoration: Object.fromEntries(["mark", "replace"].map(kind => [kind, spec => ({range: (from, to) => ({kind, spec, from, to})})]))};
+  runtime.Decoration.set = ranges => ranges;
+  const context = vm.createContext({parseMath: parserContext.parseMath, parseMarkdownImages: () => [],
+    createFormulaWidgetClass: () => class {}, createImageWidgetClass: () => class {},
+    formulaRange: formula => ({from: formula.start, to: formula.end, block: false}), selectionTouches: () => false});
+  vm.runInContext(source.slice(source.indexOf("    function createMathExtension("), source.indexOf("    function removeState(")), context);
+  const extension = context.createMathExtension(runtime, {}, {});
+  const replacements = extension.create(state).filter(range => range.kind === "replace");
+  assert.equal(replacements.length, 1);
+  assert.equal(text.slice(replacements[0].from, replacements[0].to), "x");
+  nativeValue.allDecorations = {between() {}};
+  assert.equal(extension.update([], {docChanged: true, state}).filter(range => range.kind === "replace").length, 2);
+  state.config.fields = [];
+  assert.equal(context.createMathExtension(runtime, {}, {}).create(state).filter(range => range.kind === "replace").length, 2);
+});

@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.3";
+  const VERSION = "1.5.4";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -2893,6 +2893,9 @@ const FEATURES = {
       .better-ui-imropvement-preview-delimiter {
         display: none;
       }
+      .better-ui-imropvement-preview-table-cell .cm-markdown-table-cell {
+        display: contents;
+      }
       [${FORMULA_ATTR}="inline"] {
         display: inline-block;
         max-width: 100%;
@@ -4238,10 +4241,42 @@ const FEATURES = {
       };
     }
 
+    function createTableCellExtension(runtime) {
+      const outerDecorations = runtime.view.constructor.outerDecorations;
+      if (!outerDecorations) return [];
+      const cell = runtime.Decoration.mark({
+        class: "cm-markdown-table-cell better-ui-imropvement-preview-table-cell",
+        // Inclusive outer marks keep native formula widgets inside their cells.
+        inclusive: true,
+      });
+      return outerDecorations.of((view) => {
+        const ranges = [];
+        const seen = new Set();
+        for (const plugin of view.plugins) {
+          const decorations = plugin.value?.decorations;
+          if (typeof decorations?.between !== "function") continue;
+          decorations.between(0, view.state.doc.length, (from, to, decoration) => {
+            if (decoration.spec.class !== "cm-markdown-table-cell") return;
+            const key = `${from}:${to}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            ranges.push(cell.range(from, to));
+          });
+        }
+        return runtime.Decoration.set(ranges, true);
+      });
+    }
+
     function createMathExtension(runtime, katex, context) {
       const { Decoration, StateField, DecorationsFacet } = runtime;
       const FormulaWidget = createFormulaWidgetClass(katex);
       const ImageWidget = createImageWidgetClass(context);
+      const nativeMathField = runtime.view?.state.config?.fields?.find((field) => {
+        const value = runtime.view.state.field(field, false);
+        return typeof value?.focused === "boolean"
+          && typeof value?.allDecorations?.between === "function"
+          && typeof value?.decorations?.between === "function";
+      });
 
       function replacePreview(range, widget, ranges) {
         if (range.block) {
@@ -4264,12 +4299,18 @@ const FEATURES = {
         const ranges = [];
         const images = parseMarkdownImages(source);
         const formulas = parseMath(source);
+        const nativeMath = nativeMathField && state.field(nativeMathField, false)?.allDecorations;
         for (const image of images) {
           const range = imageRange(image, state);
           const widget = new ImageWidget(image, range);
           replacePreview(range, widget, ranges);
         }
         for (const formula of formulas) {
+          let nativeFormula = false;
+          nativeMath?.between(formula.start, formula.end, (from, to) => {
+            if (from < formula.end && to > formula.start) nativeFormula = true;
+          });
+          if (nativeFormula) continue;
           if (
             images.some((image) => (
               formula.start < image.end && formula.end > image.start
@@ -4340,7 +4381,10 @@ const FEATURES = {
       runtime.view.dispatch({
         // Higher precedence nests replacements inside native table-cell marks.
         // Default precedence replaces the cell wrapper too, breaking its columns.
-        effects: runtime.StateEffect.appendConfig.of(compartment.of(new runtime.PrecExtension(extension, 0))),
+        effects: runtime.StateEffect.appendConfig.of(compartment.of([
+          new runtime.PrecExtension(extension, 0),
+          createTableCellExtension(runtime),
+        ])),
       });
       states.set(editor, {
         editor,
