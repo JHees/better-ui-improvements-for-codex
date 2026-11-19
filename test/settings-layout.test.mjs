@@ -30,7 +30,7 @@ test("settings render an accessible switch for every feature", () => {
   const switches = [...html.matchAll(/<button\b(?=[^>]*\brole="switch")[^>]*>/gu)].map(([tag]) => tag);
   const ids = switches.map((tag) => tag.match(/data-better-ui-imropvement-ui-feature="([^"]+)"/u)?.[1]);
 
-  assert.equal(switches.length, 12);
+  assert.equal(switches.length, 13);
   assert.deepEqual(ids.slice().sort(), Array.from(features, ({ id }) => id).sort());
   const titles = new Map(Array.from(features, ({ id, title }) => [id, title]));
   for (const tag of switches) {

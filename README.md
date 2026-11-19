@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.5.4-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.5-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -19,12 +19,12 @@
 
 [Download](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [Install](#install) · [Contribute](CONTRIBUTING.md)
 
-Better UI Imropvement 1.5.4 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.5.5 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.5.4 fixes formula-table column alignment in Markdown previews and avoids rendering formulas already handled by Codex. See the [release notes](docs/RELEASE-1.5.4.md).
+Version 1.5.5 adds **Show less** to expanded sidebar projects so you can return to five chats while keeping the project open. See the [release notes](docs/RELEASE-1.5.5.md).
 
 > [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.5.4`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.5.5`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
 
 ## Highlights
 
@@ -61,6 +61,7 @@ For help, open an [issue](https://github.com/JHees/better-ui-improvements-for-co
 | Project backgrounds and colors | On | Stable |
 | Conversation project colors | On | Stable for assigned project conversations; ordinary chats keep the default style |
 | 5-hour / Weekly / Credit usage | On | Stable when the current page exposes usage data |
+| Collapse project chats | On | After expanding a project list, select **Show less** to return to its default five chats. |
 | App theme toggle | On | Independent sidebar button switches and saves Codex's light/dark appearance; shows the target mode on hover |
 | Hide quota-exhaustion prompts | On | Stable |
 | Hide Plus/Pro upgrade prompts | On | Stable; Codex app-update notices remain visible |

@@ -20,7 +20,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.4";
+  const VERSION = "1.5.5";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -65,6 +65,13 @@
       id: "hide-usage-alert",
       title: "隐藏额度耗尽提示",
       detail: "隐藏额度用尽后的弹窗、重置提示和额度卡片。",
+      defaultEnabled: true,
+      status: "可用",
+    },
+    {
+      id: "project-thread-collapse",
+      title: "项目会话收起按钮",
+      detail: "在已展开的项目会话下方显示“收起”，恢复默认显示数量。",
       defaultEnabled: true,
       status: "可用",
     },
@@ -2836,7 +2843,144 @@ function mutationsAffect(records, selector) {
   });
 }
 
+// React can leave the DOM pointer on the previous render. Use the props committed to this node.
+function committedSidebarFiber(node) {
+  const keys = Object.keys(node);
+  const props = node[keys.find(key => key.startsWith("__reactProps$"))];
+  const fiber = node[keys.find(key => key.startsWith("__reactFiber$"))];
+  if (!props || !fiber) return null;
+  if (fiber.memoizedProps === props) return fiber;
+  return fiber.alternate?.memoizedProps === props ? fiber.alternate : null;
+}
+
+function expandedProjectListProps(list) {
+  for (let fiber = committedSidebarFiber(list)?.return; fiber && typeof fiber.type !== "string"; fiber = fiber.return) {
+    const props = fiber.memoizedProps;
+    if (!Array.isArray(props?.items)) continue;
+    return props.expanded === true && !props.showLessButton && props.maxItems === 5 &&
+      typeof props.onExpandedChange === "function" ? props : null;
+  }
+  return null;
+}
+
+function projectShowMoreButton(list) {
+  const button = list.lastElementChild?.querySelector(":scope > button:not([data-codexpp])");
+  if (!button) return null;
+  for (let fiber = committedSidebarFiber(button)?.return; fiber && typeof fiber.type !== "string"; fiber = fiber.return) {
+    const children = fiber.memoizedProps?.children;
+    if ([].concat(children || []).some(child => child?.props?.id === "sidebarElectron.showMore")) return button;
+  }
+  return null;
+}
+
+function installProjectThreadCollapse() {
+  const project = "[data-sidebar-project-container-id]";
+  const lists = project + ' [role="list"]';
+  const buttons = new Map();
+  let template = null;
+  let footerClass = "flex gap-1 py-1 px-8";
+  let frame = 0;
+
+  // Copy only presentation. Disabled state, IDs and native actions belong to Show more.
+  function captureTemplate(more) {
+    const button = document.createElement("button");
+    button.className = more.className;
+    for (const attr of ["data-color", "data-variant", "data-size", "data-squircle", "data-optically-align", "style"]) {
+      if (more.hasAttribute(attr)) button.setAttribute(attr, more.getAttribute(attr));
+    }
+    let parent = button;
+    for (let span = more.firstElementChild; span?.tagName === "SPAN"; span = span.firstElementChild) {
+      const inner = document.createElement("span");
+      inner.className = span.className;
+      parent.append(inner);
+      parent = inner;
+    }
+    footerClass = more.parentElement.className;
+    return button;
+  }
+
+  // A fully expanded sidebar may mount without any native Show more button to sample.
+  function nativeGhostButton() {
+    const example = document.querySelector('button[data-color="secondary"][data-variant="ghost"]:not([data-codexpp])');
+    const button = document.createElement("button");
+    const baseClass = [...(example?.classList || [])].find(name => name.startsWith("Button-"));
+    if (baseClass) button.className = baseClass;
+    button.dataset.color = "secondary";
+    button.dataset.variant = "ghost";
+    button.dataset.size = "xs";
+    button.dataset.squircle = "";
+    button.dataset.opticallyAlign = "start";
+    button.style.setProperty("--button-font-weight", "var(--font-weight-normal)");
+    button.style.setProperty("--color-text-secondary-ghost", "var(--color-text-tertiary)");
+    const inner = document.createElement("span");
+    inner.className = example?.firstElementChild?.className || "";
+    const label = document.createElement("span");
+    label.className = "text-base";
+    inner.append(label);
+    button.append(inner);
+    return button;
+  }
+
+  function sync() {
+    frame = 0;
+    const expanded = new Set();
+    const projectLists = [...document.querySelectorAll(lists)];
+    const previousTemplate = template;
+    if (!template) {
+      for (const list of projectLists) {
+        const more = projectShowMoreButton(list);
+        if (more && !more.disabled) { template = captureTemplate(more); break; }
+      }
+    }
+    for (const list of projectLists) {
+      if (!expandedProjectListProps(list)) continue;
+      expanded.add(list);
+      let row = buttons.get(list);
+      if (!row) {
+        row = document.createElement("div");
+        buttons.set(list, row);
+      }
+      if (!row.firstElementChild || template !== previousTemplate) {
+        const button = template?.cloneNode(true) || nativeGhostButton();
+        button.type = "button";
+        button.dataset.codexpp = "project-thread-collapse";
+        let label = button;
+        while (label.firstElementChild) label = label.firstElementChild;
+        label.textContent = /^zh/i.test(document.documentElement.lang || navigator.language) ? "收起" : "Show less";
+        button.onclick = () => {
+          if (list.isConnected && list.closest(project)) expandedProjectListProps(list)?.onExpandedChange(false);
+        };
+        row.replaceChildren(button);
+      }
+      const more = projectShowMoreButton(list);
+      const className = more ? "contents" : footerClass;
+      if (row.className !== className) row.className = className;
+      const anchor = more || list;
+      if (anchor.nextElementSibling !== row) anchor.after(row);
+    }
+    for (const [list, row] of buttons) {
+      if (expanded.has(list)) continue;
+      row.remove();
+      buttons.delete(list);
+    }
+  }
+
+  const observer = new MutationObserver(records => {
+    if (!frame && mutationsAffect(records, project)) frame = requestAnimationFrame(sync);
+  });
+  observer.observe(document, {subtree: true, childList: true, attributes: true,
+    attributeFilter: ["data-app-action-sidebar-project-show-all"]});
+  sync();
+  return () => {
+    observer.disconnect();
+    cancelAnimationFrame(frame);
+    for (const row of buttons.values()) row.remove();
+    buttons.clear();
+  };
+}
+
 const FEATURES = {
+  "project-thread-collapse": installProjectThreadCollapse,
   "thread-title-regeneration"(api) {
     return sessionThreadActions.enable(SESSION_ACTION_REGENERATE_TITLE, api);
   },
@@ -10365,7 +10509,7 @@ function writeFlag(api, id, on) {
       {
         id: "usage",
         title: "侧栏",
-        features: ["show-usage-in-sidebar", "hide-native-usage", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
+        features: ["project-thread-collapse", "show-usage-in-sidebar", "hide-native-usage", "app-theme-toggle", "hide-usage-alert", "hide-upgrade-prompts"],
       },
       {
         id: "sidebar",

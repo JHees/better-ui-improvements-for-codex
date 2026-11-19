@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.5.4-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.5-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -19,12 +19,12 @@
 
 [下载安装包](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [安装步骤](#安装) · [参与贡献](CONTRIBUTING.zh-CN.md)
 
-Better UI Imropvement 1.5.4 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.5.5 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.5.4 修复 Markdown 预览中含公式表格的列错位，并避免重复渲染 Codex 已处理的公式。详见[版本更新说明](docs/RELEASE-1.5.4.md)。
+1.5.5 为侧栏中已展开的项目会话列表添加“收起”按钮，点击即可恢复默认的 5 条会话，项目仍保持打开。详见[版本更新说明](docs/RELEASE-1.5.5.md)。
 
 > [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.5.4`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.5.5`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
 
 ## 功能亮点
 
@@ -61,6 +61,7 @@ Better UI Imropvement 1.5.4 是适用于 [Codex Script Loader](https://github.co
 | 项目背景和颜色 | 开启 | 稳定 |
 | 会话项目着色 | 开启 | 已归属项目的会话稳定可用；普通对话保持默认样式 |
 | 5 小时 / Weekly / Credit 额度 | 开启 | 当前页面能提供额度数据时稳定可用 |
+| 项目会话收起按钮 | 开启 | 展开项目会话列表后，点击“收起”即可恢复默认的 5 条会话。 |
 | 明暗主题切换按钮 | 开启 | 独立侧栏按钮，切换并保存 Codex 的浅色 / 深色外观；悬停显示目标外观 |
 | 隐藏额度耗尽提示 | 开启 | 稳定 |
 | 隐藏 Plus/Pro 升级提示 | 开启 | 稳定；保留 Codex 软件更新提示 |

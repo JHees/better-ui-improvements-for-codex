@@ -13,7 +13,7 @@ const releaseWorkflow = await readFile(path.join(repositoryRoot, ".github/workfl
 test("repository owns a self-contained Loader package contract", () => {
   assert.equal(manifest.id, "io.github.jhees.better-ui-imropvement");
   assert.equal(manifest.name, "Better UI Imropvement");
-  assert.equal(manifest.version, "1.5.4");
+  assert.equal(manifest.version, "1.5.5");
   assert.equal(manifest.lifecycleGlobal, "__betterUiImropvement");
   assert.equal(manifest.settings.mode, "page");
   assert.deepEqual(manifest.permissions, ["dom", "local-storage", "settings"]);
@@ -75,6 +75,7 @@ test("feature identifiers are stable and owned by the plugin", () => {
     "hide-native-usage",
     "app-theme-toggle",
     "hide-usage-alert",
+    "project-thread-collapse",
     "sidebar-project-backgrounds",
     "sidebar-conversation-colors",
     "render-markdown-preview-math",
