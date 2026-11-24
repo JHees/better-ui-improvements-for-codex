@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.5.5-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.6-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -19,12 +19,9 @@
 
 [下载安装包](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [安装步骤](#安装) · [参与贡献](CONTRIBUTING.zh-CN.md)
 
-Better UI Imropvement 1.5.5 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.5.6 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.5.5 为侧栏中已展开的项目会话列表添加“收起”按钮，点击即可恢复默认的 5 条会话，项目仍保持打开。详见[版本更新说明](docs/RELEASE-1.5.5.md)。
-
-> [!IMPORTANT]
-> **Codex++ 支持已止于 `1.2.4`。** 这是 BigPizzaV3 Codex++ Script Market 最后收录的版本。`1.2.4` 之后的版本（包括当前 `1.5.5`）面向 Codex Script Loader；本仓库不再为 Codex++ 发布新版本、提供兼容性修复或进行测试。
+1.5.6 恢复了置顶会话的项目配色，已在 Windows 版 Codex 26.1120.5083.0 验证。[版本说明](docs/RELEASE-1.5.6.md)
 
 ## 功能亮点
 
@@ -49,7 +46,7 @@ Better UI Imropvement 1.5.5 是适用于 [Codex Script Loader](https://github.co
 
 **更新与关闭：** 在 Loader 中检查插件更新；自动更新需要单独开启。关闭某项功能用“界面增强”开关；停用整个插件用 Loader 的禁用操作。若仍装着旧身份的插件包，先在 Loader 中移除旧包，再安装当前包。
 
-遇到问题，请附上 Codex、Loader、Better UI 版本和匿名截图，到 [Issues](https://github.com/JHees/better-ui-improvements-for-codex/issues) 反馈。旧 Codex++ Script Market 的 `1.2.4` 为最后支持版，当前插件不能安装到 Codex++。
+遇到问题，请附上 Codex、Loader、Better UI 版本和匿名截图，到 [Issues](https://github.com/JHees/better-ui-improvements-for-codex/issues) 反馈。
 
 <details>
 <summary>完整功能与默认行为</summary>
@@ -168,7 +165,7 @@ Markdown 表格、链接、换行和列宽继续由 Codex 原生预览负责。`
 
 ## 兼容性
 
-Better UI Imropvement 通过 Codex Script Loader 运行，不会修改 Codex 官方安装文件。Codex 大版本更新后，依赖界面的功能可能需要适配。Codex++ `1.2.4` 仅作为历史上的最后受支持版本保留；当前兼容性工作只面向 Codex Script Loader。
+Better UI Imropvement 通过 Codex Script Loader 运行，不会修改 Codex 官方安装文件。Codex 大版本更新后，依赖界面的功能可能需要适配。
 
 ## 可选附加脚本
 
@@ -193,7 +190,7 @@ npm run package
 ## 来源与许可
 
 - 当前运行时：[JHees/codex-script-loader](https://github.com/JHees/codex-script-loader)
-- Codex++ 市场历史版本（`1.2.4`）：[BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
+- Better UI 最后支持 Codex++ 的版本为 `1.2.4`。[脚本市场存档](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
 - 当前维护仓库：[JHees/better-ui-improvements-for-codex](https://github.com/JHees/better-ui-improvements-for-codex)
 
 项目使用 [MIT License](LICENSE)。原始版权、来源与许可声明保留在发布脚本和 [`NOTICE.md`](NOTICE.md) 中。

@@ -10,7 +10,7 @@
 
 ## 升级与验证
 
-通过 Loader 自动更新或安装本版 ZIP，现有设置继续保留，无需升级 Loader。仅支持 Codex Script Loader；Codex++ 支持仍止于 1.2.4。
+通过 Loader 自动更新或安装本版 ZIP，现有设置继续保留，无需升级 Loader。
 
 静态检查、91 项测试和独立打包通过。候选已热加载，额度数据显示恢复，插件实例替换正常，无重复额度控件或 Loader 运行错误，并已通过用户验收。
 
@@ -30,7 +30,7 @@ This release fixes sidebar quota remaining at “—” in newer Codex builds.
 
 ## Upgrade and validation
 
-Update through Loader or install the ZIP. Existing settings are preserved; no Loader upgrade is required. Codex Script Loader remains the supported runtime; Codex++ support ended at 1.2.4.
+Update through Loader or install the ZIP. Existing settings are preserved; no Loader upgrade is required.
 
 Static checks, 91 tests and package creation passed. The candidate was hot-loaded, quota display recovered, the plugin instance was replaced without duplicate quota controls or Loader runtime errors, and user acceptance passed.
 

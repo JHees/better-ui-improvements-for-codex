@@ -8,6 +8,30 @@ const source = await readFile(new URL("../scripts/better-ui-imropvement.js", imp
 const backgrounds = source.slice(source.indexOf('  "sidebar-project-backgrounds"(api) {'));
 const featureFunction = (body, name) => body.match(new RegExp(`    const ${name} = \\([\\s\\S]*?\\n    \\};`, "u"))[0];
 
+test("pinned local rows follow explicit assignments, including linked projects", () => {
+  const body = source.slice(source.indexOf('  "sidebar-conversation-colors"(api) {'));
+  const resolve = vm.runInNewContext(featureFunction(body, "pinnedProjectInfo") + "\npinnedProjectInfo", {
+    normalize: value => value.toLowerCase(),
+  });
+  const row = { getAttribute: key => ({
+    "data-app-action-sidebar-thread-id": "local:chat",
+    "data-app-action-sidebar-thread-host-id": "local",
+    "data-app-action-sidebar-thread-pinned": "true",
+  })[key] };
+  const project = {id: "cloud", label: "Shared project"};
+  const index = {byId: new Map([["cloud", project]]), assignments: {chat: {projectKind: "local", projectId: "workspace"}},
+    localProjects: {workspace: {name: "Local", chatGptBacking: {projectId: "cloud"}}}, projectless: new Set()};
+  assert.equal(resolve(row, index), project);
+  const local = {id: "workspace", label: "Local"};
+  index.byId.set("workspace", local);
+  assert.equal(resolve(row, index), local);
+  index.projectless.add("chat");
+  assert.equal(resolve(row, index), false);
+  index.projectless.clear();
+  delete index.assignments.chat;
+  assert.equal(resolve(row, index), null);
+});
+
 test("native projects remain eligible before layout and regardless of their label", () => {
   class Element { constructor(label) { this.label = label; } }
   const eligible = vm.runInNewContext(`${featureFunction(backgrounds, "isProjectRow")}\nisProjectRow`, {
@@ -172,7 +196,7 @@ test("the project frame encloses its sibling chat list without individual chat c
   const run = vm.runInNewContext(`${constants}\n${functions}\n${candidates}\n({candidateRows, projectForThread})`, {
     HTMLElement: Element, normalize: value => String(value || "").trim().toLowerCase(),
     isProjectRow: () => true,
-    reactProjectInfo: () => false, secondaryProjectInfo: () => null,
+    pinnedProjectInfo: () => null, reactProjectInfo: () => false, secondaryProjectInfo: () => null,
   });
   const rows = run.candidateRows(sidebar);
   assert.equal(rows.length, 1);
@@ -201,7 +225,7 @@ test("standalone cloud conversations resolve their native project id and share t
   const resolve = vm.runInNewContext(`${functions}\nprojectForThread`, {
     PROJECT_SELECTOR: "project", PROJECT_LIST_SELECTOR: "list", PROJECT_ID_ATTRS: [], PROJECT_LABEL_ATTRS: [],
     normalize: value => String(value || "").trim().toLowerCase(), attrValue: () => "", projectInfo: () => null,
-    secondaryProjectInfo: () => ({id: "", label: "Misleading directory name"}),
+    pinnedProjectInfo: () => null, secondaryProjectInfo: () => ({id: "", label: "Misleading directory name"}),
   });
   const thread = props => {
     let fiber = {memoizedProps: props};

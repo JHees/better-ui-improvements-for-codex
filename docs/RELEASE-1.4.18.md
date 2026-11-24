@@ -12,7 +12,7 @@ Markdown 文件预览中的 LaTeX 公式恢复显示，含公式的表格保持�
 
 - 已安装用户可通过 Codex Script Loader 的插件更新功能升级，或安装下方 `better-ui-imropvement-1.4.18.zip`。无需迁移设置，权限不变。
 - 数学预览增强作用于 Markdown 文件预览。Codex 聊天消息已有原生公式支持；本版不接管聊天消息的公式渲染。
-- ZIP 旁提供同名 `.sha256` 校验文件。当前版本面向 Codex Script Loader；Codex++ 的最后受支持版本仍为 1.2.4。
+- ZIP 旁提供同名 `.sha256` 校验文件。
 
 ## 验证
 
@@ -32,7 +32,7 @@ This patch restores LaTeX in Markdown file previews and preserves table columns 
 
 ### Upgrading
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.18.zip` with its matching `.sha256` file. Settings and permissions are unchanged. This enhancement applies to Markdown file previews; chat messages retain native Codex math rendering. Codex++ support remains frozen at 1.2.4.
+Update through Codex Script Loader or install `better-ui-imropvement-1.4.18.zip` with its matching `.sha256` file. Settings and permissions are unchanged. This enhancement applies to Markdown file previews; chat messages retain native Codex math rendering.
 
 Validation includes static checks, 28 tests, browser regression checks for math, tables, editing and cleanup, and an accepted candidate verified through an in-place reload.
 

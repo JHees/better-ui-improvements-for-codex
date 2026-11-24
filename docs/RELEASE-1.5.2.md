@@ -13,7 +13,7 @@
 
 ## 升级与验证
 
-通过 Loader 的插件更新功能或安装本版 ZIP 升级，现有设置保留，无需升级 Loader。仅支持 Codex Script Loader；Codex++ 支持仍止于 1.2.4。
+通过 Loader 的插件更新功能或安装本版 ZIP 升级，现有设置保留，无需升级 Loader。
 
 静态检查、94 项测试及独立打包通过。测试覆盖旧版入口、新版入口与导出改名、模块工厂压缩变化、原型方法、RPC 代理、异常导出和失效缓存恢复。候选已热加载并通过用户验收：额度显示正常、实例替换成功，无重复额度控件或 Loader 运行错误。
 
@@ -36,7 +36,7 @@ This release restores sidebar quota display in newer Rspack-based Codex builds a
 
 ## Upgrade and validation
 
-Update through Loader's plugin updates or install the ZIP. Existing settings are preserved; no Loader upgrade is required. Codex Script Loader remains the supported runtime; Codex++ support ended at 1.2.4.
+Update through Loader's plugin updates or install the ZIP. Existing settings are preserved; no Loader upgrade is required.
 
 Static checks, 94 tests and package creation passed. Tests cover legacy entries, renamed entries and exports, changed module factory source, prototype methods, RPC proxies, failing exports and stale client cache recovery. The candidate was hot-loaded and accepted by the user, with working quota display, successful instance replacement, no duplicate quota controls and no Loader runtime errors.
 

@@ -10,7 +10,7 @@
 
 ## 升级与验证范围
 
-通过 Codex Script Loader 更新，或安装独立的 `better-ui-imropvement-1.5.4.zip`。同名 `.sha256` 文件用于校验，无需修改 Markdown 原文。Codex++ 支持仍止于 1.2.4。
+通过 Codex Script Loader 更新，或安装独立的 `better-ui-imropvement-1.5.4.zip`。同名 `.sha256` 文件用于校验，无需修改 Markdown 原文。
 
 静态检查及 101 项测试通过。候选在 Windows Codex 26.1106.6628.0 的真实预览组件中通过宽、窄布局、公式编辑、重排及卸载清理检查；热加载后，当前文档已渲染的 22 行表格没有公式脱离单元格，两个窗口的插件均正常运行。其他 Codex 版本未做实机验证。
 
@@ -26,7 +26,7 @@ This release fixes misaligned formula tables in Markdown file previews and works
 
 ## Upgrade and validation
 
-Update through Codex Script Loader or install the independent `better-ui-imropvement-1.5.4.zip`. A matching `.sha256` file is supplied. No Markdown source changes are required. Codex++ support remains limited to version 1.2.4.
+Update through Codex Script Loader or install the independent `better-ui-imropvement-1.5.4.zip`. A matching `.sha256` file is supplied. No Markdown source changes are required.
 
 Static checks and 101 tests passed. Live candidate checks on Windows Codex 26.1106.6628.0 covered wide and narrow layouts, formula edits, reflow, and extension cleanup. After hot reload, none of the 22 rendered table rows in the open document had formulas outside their cells, and the plugin was running in both windows. Other Codex versions have not been tested live.
 

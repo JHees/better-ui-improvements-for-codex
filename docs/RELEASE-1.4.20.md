@@ -13,7 +13,7 @@
 
 ## 升级与验证
 
-通过 Codex Script Loader 的插件更新功能升级，或安装 `better-ui-imropvement-1.4.20.zip` 及配套 `.sha256` 校验文件。设置、权限和插件身份不变。Codex++ 支持仍止于 1.2.4。
+通过 Codex Script Loader 的插件更新功能升级，或安装 `better-ui-imropvement-1.4.20.zip` 及配套 `.sha256` 校验文件。设置、权限和插件身份不变。
 
 静态检查、35 项测试及独立包校验通过。新增回归测试覆盖没有预加载 KaTeX、没有块级公式的场景。已验收候选通过热加载，实际验证了正文行内公式、表格公式、相对图片和货币文本；设置页、额度悬停与菜单入口回归正常。本轮未对真实会话执行标题生成、删除或导出。
 
@@ -34,7 +34,7 @@ This patch fixes Markdown previews that show raw LaTeX when an inline-only or ta
 
 ### Upgrading and validation
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.20.zip` with its matching `.sha256`. Settings, permissions, and identity are unchanged. Codex++ support remains frozen at 1.2.4.
+Update through Codex Script Loader or install `better-ui-imropvement-1.4.20.zip` with its matching `.sha256`. Settings, permissions, and identity are unchanged.
 
 Syntax checks, 35 tests, and standalone package validation pass. The added regression covers a preview with neither preloaded KaTeX nor a block formula. The accepted candidate was hot-loaded and checked for inline/table formulas, relative images, currency text, settings pages, usage hover behavior, and menu entries. Live thread title generation, deletion, and export were not exercised.
 

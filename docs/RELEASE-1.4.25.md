@@ -13,7 +13,7 @@
 
 ## 升级
 
-已安装用户可在 Codex Script Loader 中检查插件更新；开启自动更新的用户可使用自动更新。也可下载 `better-ui-imropvement-1.4.25.zip`，用配套 `.zip.sha256` 校验后通过 Loader 安装，无需先卸载。已有设置保留，无新增权限或依赖。Codex++ 支持仍止于 1.2.4。
+已安装用户可在 Codex Script Loader 中检查插件更新；开启自动更新的用户可使用自动更新。也可下载 `better-ui-imropvement-1.4.25.zip`，用配套 `.zip.sha256` 校验后通过 Loader 安装，无需先卸载。已有设置保留，无新增权限或依赖。
 
 ## 验证与限制
 
@@ -39,7 +39,7 @@ Fixes slash-menu scrolling stalls and keeps project and associated conversation 
 
 ### Upgrade
 
-Check for plugin updates in Codex Script Loader, or use automatic updates if enabled. Alternatively, download `better-ui-imropvement-1.4.25.zip`, verify the matching `.zip.sha256`, and install it through Loader without uninstalling first. Existing settings are preserved. No new permissions or dependencies are required. Codex++ support remains frozen at 1.2.4.
+Check for plugin updates in Codex Script Loader, or use automatic updates if enabled. Alternatively, download `better-ui-imropvement-1.4.25.zip`, verify the matching `.zip.sha256`, and install it through Loader without uninstalling first. Existing settings are preserved. No new permissions or dependencies are required.
 
 ### Validation and limitations
 

@@ -25,7 +25,7 @@
 
 ## 升级与验证
 
-通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.22.zip`，使用配套 `.sha256` 校验。无需更改 Loader，无新增权限或依赖；已有设置和项目颜色分配保留。Codex++ 支持仍止于 1.2.4。
+通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.22.zip`，使用配套 `.sha256` 校验。无需更改 Loader，无新增权限或依赖；已有设置和项目颜色分配保留。
 
 正式源码通过静态检查、46 项测试及独立包校验。候选在 Windows Codex 26.930.3930.0 中完成热加载，确认云项目框覆盖三个下属会话、项目内没有独立色条、独立会话采用圆角背景，运行实例替换后没有新增错误或重复样式；整体颜色框与会话外观已获用户验收。
 
@@ -60,7 +60,7 @@ This update improves sidebar colors: cloud project frames now enclose their chil
 
 ### Upgrading and validation
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.22.zip` and verify its matching `.sha256`. No Loader changes, new permissions or dependencies are required. Existing settings and project color assignments are preserved. Codex++ support remains frozen at 1.2.4.
+Update through Codex Script Loader or install `better-ui-imropvement-1.4.22.zip` and verify its matching `.sha256`. No Loader changes, new permissions or dependencies are required. Existing settings and project color assignments are preserved.
 
 The release source passes syntax checks, 46 tests and standalone package validation. The candidate was hot-loaded in Codex 26.930.3930.0 on Windows: the cloud project frame encloses its three conversations, project children have no independent stripes, and standalone conversations have rounded backgrounds. Instance replacement produced no new runtime errors or duplicate styles. The project frame and conversation appearance were accepted by the user.
 

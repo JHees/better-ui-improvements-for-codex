@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.5.5-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.6-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -19,12 +19,9 @@
 
 [Download](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [Install](#install) · [Contribute](CONTRIBUTING.md)
 
-Better UI Imropvement 1.5.5 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.5.6 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.5.5 adds **Show less** to expanded sidebar projects so you can return to five chats while keeping the project open. See the [release notes](docs/RELEASE-1.5.5.md).
-
-> [!IMPORTANT]
-> **Codex++ support ended with version `1.2.4`.** That is the final version published in the BigPizzaV3 Codex++ Script Market. Versions after `1.2.4`, including the current `1.5.5`, target Codex Script Loader. No new releases, compatibility fixes, or testing are provided for Codex++.
+Version 1.5.6 restores project colors on pinned chats. Verified with Codex Desktop for Windows 26.1120.5083.0. [Release notes](docs/RELEASE-1.5.6.md)
 
 ## Highlights
 
@@ -49,7 +46,7 @@ Version 1.5.5 adds **Show less** to expanded sidebar projects so you can return 
 
 **Update or disable:** Check for plugin updates in Loader; automatic updates are opt-in. Use Interface enhancements to turn individual features off, or disable the entire plugin in Loader. If a package with the previous plugin identity is still installed, remove that old package before installing this one.
 
-For help, open an [issue](https://github.com/JHees/better-ui-improvements-for-codex/issues) with your Codex, Loader and Better UI versions and an anonymized screenshot. The old Codex++ Script Market build stopped at `1.2.4`; current packages are not compatible with Codex++.
+For help, open an [issue](https://github.com/JHees/better-ui-improvements-for-codex/issues) with your Codex, Loader and Better UI versions and an anonymized screenshot.
 
 <details>
 <summary>Full feature list and defaults</summary>
@@ -168,7 +165,7 @@ Markdown tables, links, wrapping, and column sizing remain Codex-native. Currenc
 
 ## Compatibility
 
-Better UI Imropvement runs through Codex Script Loader and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases. Codex++ `1.2.4` is retained only as the historical final supported build; active compatibility work is limited to Codex Script Loader.
+Better UI Imropvement runs through Codex Script Loader and does not modify the official Codex installation. Features that depend on Codex's interface may need updates after major Codex releases.
 
 ## Optional companion script
 
@@ -193,7 +190,7 @@ Feedback, translations, screenshots and focused fixes are welcome. Start with th
 ## Credits and license
 
 - Active runtime: [JHees/codex-script-loader](https://github.com/JHees/codex-script-loader)
-- Legacy Codex++ market snapshot (`1.2.4`): [BigPizzaV3/CodexPlusPlusScriptMarket](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
+- The last Better UI version for Codex++ was `1.2.4`. [Script Market archive](https://github.com/BigPizzaV3/CodexPlusPlusScriptMarket)
 - Maintained repository: [JHees/better-ui-improvements-for-codex](https://github.com/JHees/better-ui-improvements-for-codex)
 
 Released under the [MIT License](LICENSE). Original copyright, attribution, and permission notices are preserved in the distributed script and [`NOTICE.md`](NOTICE.md).

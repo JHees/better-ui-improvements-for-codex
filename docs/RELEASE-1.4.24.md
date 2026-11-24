@@ -11,7 +11,7 @@
 
 ## 安装与源码
 
-下载本页的 `better-ui-imropvement-1.4.24.zip`，使用配套 `.zip.sha256` 校验，并通过 Codex Script Loader 安装。已安装早期 1.4.24 的用户应重新安装这个同版本 ZIP；按版本号比较的自动更新可能不会提示。无需卸载，无新增权限或依赖，已有设置保留。Codex++ 支持仍止于 1.2.4。
+下载本页的 `better-ui-imropvement-1.4.24.zip`，使用配套 `.zip.sha256` 校验，并通过 Codex Script Loader 安装。已安装早期 1.4.24 的用户应重新安装这个同版本 ZIP；按版本号比较的自动更新可能不会提示。无需卸载，无新增权限或依赖，已有设置保留。
 
 修复源码：[fcd0f39](https://github.com/JHees/better-ui-improvements-for-codex/commit/fcd0f3907da3713dcdad1b5931c99b5698c614a5)。`v1.4.24` 标签及 GitHub 自动生成的 Source code 归档仍对应首次发布源码；本页插件 ZIP 已包含此次修复。重建修复包时应使用上述修复提交。
 
@@ -37,7 +37,7 @@ Same-version hotfix reissue on 2026-10-12: the native confirmation dialog closes
 
 ### Installation and source
 
-Download `better-ui-imropvement-1.4.24.zip` from this release, verify its matching `.zip.sha256`, and install it through Codex Script Loader. Users with the earlier 1.4.24 package should reinstall this same-version ZIP; version-based automatic updates may not offer it. No uninstall, new permissions or dependencies are required, and existing settings are preserved. Codex++ support remains frozen at 1.2.4.
+Download `better-ui-imropvement-1.4.24.zip` from this release, verify its matching `.zip.sha256`, and install it through Codex Script Loader. Users with the earlier 1.4.24 package should reinstall this same-version ZIP; version-based automatic updates may not offer it. No uninstall, new permissions or dependencies are required, and existing settings are preserved.
 
 Hotfix source: [fcd0f39](https://github.com/JHees/better-ui-improvements-for-codex/commit/fcd0f3907da3713dcdad1b5931c99b5698c614a5). The `v1.4.24` tag and GitHub-generated Source code archives still point to the initial release. The plugin ZIP on this page contains the hotfix. Use the linked hotfix commit when rebuilding it.
 

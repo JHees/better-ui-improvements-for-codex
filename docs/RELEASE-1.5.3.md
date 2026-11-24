@@ -11,7 +11,7 @@
 
 ## 升级与验证范围
 
-通过 Loader 安装或更新独立的 `better-ui-imropvement-1.5.3.zip`；同名 `.sha256` 文件用于校验。不改变 Codex++ 最后支持版本 1.2.4 的边界。
+通过 Loader 安装或更新独立的 `better-ui-imropvement-1.5.3.zip`；同名 `.sha256` 文件用于校验。
 
 静态检查和 99 项测试通过。候选已在真实主窗口验证主题双向切换、模型列表恢复、设置页和 KaTeX 公式输出。完整文件预览、导出保存对话框及删除确认流程未完成实机验收；没有为此次修复额外生成标题或删除聊天。
 
@@ -24,7 +24,7 @@ This release adapts native-module discovery to newer Codex builds and repairs ap
 - Reuse the bundled KaTeX module and the CodeMirror module belonging to the active editor instead of relying only on older asset filenames.
 - Prefer the current native deletion-confirmation entry point, skip opaque function exports, and preserve native eligibility checks.
 
-Update the independent `better-ui-imropvement-1.5.3.zip` package through Loader. A matching SHA-256 file is supplied. Codex++ support remains limited to version 1.2.4.
+Update the independent `better-ui-imropvement-1.5.3.zip` package through Loader. A matching SHA-256 file is supplied.
 
 Static checks and 99 tests passed. Live candidate checks cover both theme directions, model-list recovery, settings and KaTeX output. Full file preview, export-save and deletion-confirmation acceptance remain incomplete; no additional title generation or chat deletion was performed.
 

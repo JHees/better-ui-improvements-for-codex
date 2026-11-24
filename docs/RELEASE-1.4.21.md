@@ -16,7 +16,7 @@
 
 ## 升级与验证
 
-通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.21.zip`，配套 `.sha256` 可用于校验。现有设置保留，无新增权限或依赖。Codex++ 支持仍止于 1.2.4。
+通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.21.zip`，配套 `.sha256` 可用于校验。现有设置保留，无新增权限或依赖。
 
 正式发布源码通过静态检查、39 项测试及独立包校验。已在 Windows Codex 26.928.2636.0 热加载候选，验证关闭额度后主题按钮保留、重新开启无重复节点，以及悬停目标文字。启动过渡由自动回归覆盖；本轮没有退出 Codex 执行完整冷启动验收，也没有为验证而切换用户当前明暗偏好。
 
@@ -40,7 +40,7 @@ Switch Codex between light and dark directly from the sidebar, and show usage on
 
 ### Upgrading and validation
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.21.zip` with its matching `.sha256`. Existing preferences are preserved; no new permissions or dependencies are required. Codex++ support remains frozen at 1.2.4.
+Update through Codex Script Loader or install `better-ui-imropvement-1.4.21.zip` with its matching `.sha256`. Existing preferences are preserved; no new permissions or dependencies are required.
 
 The release source passes syntax checks, 39 tests and standalone package validation. The candidate was hot-loaded in Codex 26.928.2636.0 on Windows to check independent toggles, duplicate-free remounting and hover labels. Startup transitions are covered by regression tests; a full app cold start and live changes to the user's current appearance preference were not performed in this round.
 

@@ -5,8 +5,7 @@
  * Copyright (c) 2026 JHees. Released under the MIT License.
  *
  * This file began as a compatibility migration from the b-nnett Codex++
- * tweak. BigPizzaV3 Codex++ support ended with the market-published 1.2.4;
- * active versions now target Codex Script Loader. The UI implementation
+ * tweak. The UI implementation
  * below is not original work by the migrator; the wrapper only adapts
  * storage/logging/renderer lifecycle assumptions.
  *
@@ -20,7 +19,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.5";
+  const VERSION = "1.5.6";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -2180,6 +2179,7 @@ function createSessionThreadActionsManager() {
   }
 
   return {
+    queryClientForRow(row) { return scopeFromRow(row)?.queryClient; },
     async setAppTheme(theme) {
       if (!["light", "dark"].includes(theme)) throw new Error("Invalid app theme");
       // Current Codex exposes the native settings service in its loaded module runtime.
@@ -9476,6 +9476,9 @@ const FEATURES = {
     let applyTimer = 0;
     let colorEventHandler = null;
     let colorPrefs = {};
+    const membershipKeys = ["thread-project-assignments", "local-projects", "projectless-thread-ids"]
+      .map(key => ["vscode", "get-global-state", JSON.stringify({ key })]);
+    let membershipClient = null, unsubscribeMembership;
 
     document.getElementById(STYLE_ID)?.remove();
     const style = document.createElement("style");
@@ -9572,7 +9575,32 @@ const FEATURES = {
         const info = projectInfo(row);
         if (info) byList.set(normalize(listId), info);
       }
-      return { byId, byList };
+      const pinned = sidebar.querySelector('[data-app-action-sidebar-thread-pinned="true"]');
+      const client = pinned ? sessionThreadActions.queryClientForRow(pinned) : null;
+      if (client !== membershipClient) {
+        unsubscribeMembership?.();
+        membershipClient = client;
+        unsubscribeMembership = client?.getQueryCache?.().subscribe(({ type, query }) => {
+          if ((type === "updated" || type === "removed") && membershipKeys.some(key =>
+            key.every((part, i) => query.queryKey[i] === part))) scheduleApply();
+        });
+      }
+      const [assignments, localProjects, projectless] = membershipKeys.map(key => client?.getQueryData?.(key)?.value);
+      return { byId, byList, assignments, localProjects, projectless: new Set(Array.isArray(projectless) ? projectless : []) };
+    };
+
+    const pinnedProjectInfo = (thread, index) => {
+      if (thread.getAttribute("data-app-action-sidebar-thread-pinned") !== "true" ||
+          thread.getAttribute("data-app-action-sidebar-thread-host-id") !== "local") return null;
+      const key = thread.getAttribute("data-app-action-sidebar-thread-id");
+      if (!key?.startsWith("local:")) return null;
+      const threadId = key.slice("local:".length);
+      if (index.projectless.has(threadId)) return false;
+      const id = index.assignments?.[threadId]?.projectId;
+      if (typeof id !== "string" || !id) return null;
+      const local = index.localProjects?.[id];
+      return index.byId.get(normalize(id)) || index.byId.get(normalize(local?.chatGptBacking?.projectId)) ||
+        { id, label: local?.name || "", key: `id:${normalize(id)}` };
     };
 
     const secondaryProjectInfo = (thread) => {
@@ -9649,6 +9677,9 @@ const FEATURES = {
         return { id: "", label, key: `label:${label}` };
       }
 
+      const assigned = pinnedProjectInfo(thread, index);
+      if (assigned === false) return null;
+      if (assigned) return assigned;
       const reactInfo = reactProjectInfo(thread);
       if (reactInfo === false) return null;
       if (reactInfo) return index.byId.get(normalize(reactInfo.id)) || reactInfo;
@@ -9762,6 +9793,7 @@ const FEATURES = {
       observer.disconnect();
       if (applyTimer) window.clearTimeout(applyTimer);
       if (colorEventHandler) window.removeEventListener(COLOR_EVENT, colorEventHandler);
+      unsubscribeMembership?.();
       activeSidebar?.querySelectorAll(`[${ATTR}="row"]`).forEach((row) => {
         if (row instanceof HTMLElement) clearRow(row);
       });

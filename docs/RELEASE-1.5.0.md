@@ -13,7 +13,7 @@
 
 ## 升级与验证
 
-通过 Loader 自动更新或安装本版 ZIP；设置沿用现有存储。仅支持 Codex Script Loader，Codex++ 市场最后支持版本仍为 1.2.4。
+通过 Loader 自动更新或安装本版 ZIP；设置沿用现有存储。
 
 静态检查、90 项测试和独立打包通过；候选已实际热加载，检查了设置页、实例替换、额度选择保留和重复节点。没有宣称完成前台逐帧闪烁测量。
 
@@ -30,7 +30,7 @@ This release improves menus, sidebar controls and settings in the newer Codex in
 - Consolidates palette editing, layout and preview, adds short explanations where needed, and replaces the settings icon with a panel symbol.
 - Retains native Usage-button hiding, math/local-image previews, title generation, Markdown export and native permanent-delete confirmation.
 
-Update through Loader or install the ZIP; existing settings remain in their current storage. Codex Script Loader is the supported runtime; Codex++ support ended at 1.2.4.
+Update through Loader or install the ZIP; existing settings remain in their current storage.
 
 Validation passed static checks, 90 tests and package creation. The candidate was hot-loaded and checked for settings layout, instance replacement, retained quota selection and duplicate controls. Foreground frame-by-frame flicker measurement was not completed.
 

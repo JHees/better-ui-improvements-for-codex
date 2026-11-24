@@ -11,7 +11,7 @@
 
 ## 升级与兼容性
 
-通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.23.zip`，使用配套 `.zip.sha256` 校验。无需修改 Loader，无新增权限或依赖；已有设置和项目颜色分配保留。Codex++ 支持仍止于 1.2.4。
+通过 Codex Script Loader 更新，或安装 `better-ui-imropvement-1.4.23.zip`，使用配套 `.zip.sha256` 校验。无需修改 Loader，无新增权限或依赖；已有设置和项目颜色分配保留。
 
 候选已在 Windows Codex 26.1002.7124.0 中热加载：标题模型列表恢复为就绪，读取到 7 个可见模型，已保存的模型仍可用；11 个受支持会话菜单正常挂接，插件实例已替换，Loader 注入失败数为 0，没有重复插件节点。原生下拉组件、主题设置入口与 KaTeX 渲染入口可识别，额度显示正常。
 
@@ -36,7 +36,7 @@ This update restores native chat service discovery after a Codex update and fixe
 
 ### Upgrading and compatibility
 
-Update through Codex Script Loader or install `better-ui-imropvement-1.4.23.zip` and verify its matching `.zip.sha256`. No Loader changes, new permissions or dependencies are required. Existing settings and project color assignments are preserved. Codex++ support remains frozen at 1.2.4.
+Update through Codex Script Loader or install `better-ui-imropvement-1.4.23.zip` and verify its matching `.zip.sha256`. No Loader changes, new permissions or dependencies are required. Existing settings and project color assignments are preserved.
 
 The candidate was hot-loaded in Codex 26.1002.7124.0 on Windows: model loading returned to ready with seven visible models and the saved choice available; all 11 supported conversation menus were attached, the plugin instance was replaced, and Loader reported zero injection failures with no duplicate plugin nodes. Native dropdown, appearance-setting and KaTeX entry points remain discoverable, and quota display works.
 
