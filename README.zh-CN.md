@@ -4,7 +4,7 @@
 
 **面向 Codex Script Loader 的界面与工作流增强插件。**
 
-[![Version](https://img.shields.io/badge/version-1.5.6-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.7-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#兼容性)
@@ -19,9 +19,9 @@
 
 [下载安装包](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [安装步骤](#安装) · [参与贡献](CONTRIBUTING.zh-CN.md)
 
-Better UI Imropvement 1.5.6 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
+Better UI Imropvement 1.5.7 是适用于 [Codex Script Loader](https://github.com/JHees/codex-script-loader) 的 renderer-only 插件。它将项目化侧栏、真实额度显示、Markdown 预览增强、压缩上下文标题生成、原生会话导出和永久删除以及独立设置面板整合为一个可直接安装的脚本。
 
-1.5.6 恢复了置顶会话的项目配色，已在 Windows 版 Codex 26.1120.5083.0 验证。[版本说明](docs/RELEASE-1.5.6.md)
+1.5.7 恢复了配色设置中的原生下拉菜单，已在 Windows 版 Codex 26.1120.5083.0 验证。[版本说明](docs/RELEASE-1.5.7.md)
 
 ## 功能亮点
 

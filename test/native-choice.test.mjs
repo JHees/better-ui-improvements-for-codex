@@ -4,7 +4,16 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 const source=await readFile(new URL('../scripts/better-ui-imropvement.js',import.meta.url),'utf8');
 const functions=source.slice(source.indexOf('  function nativeFactoryExport('),source.indexOf('  function reportLifecycle('));
-const {nativeFactoryExport,nativeChoiceElement}=vm.runInNewContext(`${functions}\n({nativeFactoryExport,nativeChoiceElement})`,{Event});
+const {nativeFactoryExport,nativeChoiceElement,cachedNativeChoices}=vm.runInNewContext(`${functions}\n({nativeFactoryExport,nativeChoiceElement,cachedNativeChoices})`,{Event});
+
+test('current Codex resolves the cached menu without requiring a legacy shared chunk',()=>{
+ const React={createElement(){},useState(){}}, ReactDOM={createRoot(){},hydrateRoot(){}};
+ const Menu={RadioGroup(){},RadioItem(){},Section(){},Title(){}};
+ function Dropdown({triggerButton:t,matchTriggerWidth:w,onOpenAutoFocus:f}){return [t,w,f];}
+ const runtime={c:{a:{exports:React},b:{exports:ReactDOM},c:{exports:{renamedMenu:Menu,renamedDropdown:Dropdown}}},m:{c:Dropdown}};
+ const choices=cachedNativeChoices(runtime);
+ assert.equal(choices.React,React);assert.equal(choices.ReactDOM,ReactDOM);assert.equal(choices.Menu,Menu);assert.equal(choices.Dropdown,Dropdown);
+});
 
 test('native UI factories resolve through renamed export wrappers, not fixed bundle aliases',()=>{
  const bundle='var r$=q((e=>{e.createElement=function(){};})),reactWrap=q(((e,t)=>{t.exports=r$()})),client=q((e=>{e.createRoot=function(){};})),domWrap=q(((e,t)=>{function check(){}check(),t.exports=client()}));export{reactWrap as abc,domWrap as xyz};';
@@ -39,4 +48,15 @@ test('native roots and their portaled menus unmount with their settings containe
  unmount({contains:select=>select===one});
  assert.equal(nativeChoiceRoots.size,1);assert.deepEqual(events,['unmount 0','remove 0']);
  unmount();assert.equal(nativeChoiceRoots.size,0);assert.deepEqual(events,['unmount 0','remove 0','unmount 1','remove 1']);
+});
+
+test('a missing Codex menu restores the original editable select',async()=>{
+ const select={isConnected:true,hidden:false,before(){}};
+ const host={isConnected:true,dataset:{},remove(){this.isConnected=false;}};
+ const body=source.slice(source.indexOf('  function mountNativeChoices('),source.indexOf('  let projectTheme;'));
+ const mount=vm.runInNewContext(body+'\nmountNativeChoices',{document:{createElement:()=>host},nativeChoiceRoots:new Map(),
+   loadNativeChoices:async()=>{throw Error('absent');},rendererApi:{log:{warn(){}}}});
+ mount({querySelectorAll:()=>[select]});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(select.hidden,false);assert.equal(host.isConnected,false);
 });

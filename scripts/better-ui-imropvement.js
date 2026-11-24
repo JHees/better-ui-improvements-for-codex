@@ -19,7 +19,7 @@
   "use strict";
 
   const INSTALL_KEY = "__betterUiImropvement";
-  const VERSION = "1.5.6";
+  const VERSION = "1.5.7";
   const PINNED_THREAD_ICON_STYLE_ID = "better-ui-imropvement-ui-pinned-thread-icon-style";
   const PROJECT_COLOR_STORAGE_KEY = "sidebar-project-backgrounds:colors";
   const LEGACY_STORAGE_PREFIX = "better-ui-imropvement-ui-improvements:";
@@ -226,6 +226,33 @@
     const exported = wrapper && source.slice(source.lastIndexOf("export{")).match(new RegExp(`(?:\\{|,)${escape(wrapper[1])} as ([\\w$]+)`));
     if (!exported) throw new Error("Codex UI factory export was not found");
     return exported[1];
+  }
+
+  function dropdownSource(text) {
+    return text.includes("triggerButton:") && text.includes("matchTriggerWidth:") && text.includes("onOpenAutoFocus:");
+  }
+
+  function choiceComponents(module) {
+    const values = Object.values(module);
+    const Menu = values.find(value => value && typeof value === "object" && value.RadioGroup && value.RadioItem && value.Section && value.Title);
+    const Dropdown = values.find(value => typeof value === "function" && dropdownSource(Function.prototype.toString.call(value)));
+    return { Menu, Dropdown };
+  }
+
+  function cachedNativeChoices(runtime) {
+    let React, ReactDOM, components;
+    for (const [id, record] of Object.entries(runtime.c)) {
+      const mod = Object.getOwnPropertyDescriptor(record, "exports")?.value;
+      if (!mod) continue;
+      if (Object.hasOwn(mod, "createElement") && Object.hasOwn(mod, "useState")) React = mod;
+      if (Object.hasOwn(mod, "createRoot") && Object.hasOwn(mod, "hydrateRoot")) ReactDOM = mod;
+      const factory = runtime.m[id];
+      if (!components && typeof factory === "function" && dropdownSource(Function.prototype.toString.call(factory))) {
+        const found = choiceComponents(mod);
+        if (found.Dropdown && found.Menu) components = found;
+      }
+      if (React && ReactDOM && components) return { React, ReactDOM, ...components };
+    }
   }
 
   function nativeChoiceElement(runtime, select, focus = {}) {
@@ -10044,6 +10071,10 @@ function writeFlag(api, id, on) {
   let nativeChoiceFocus = null;
   const nativeChoiceRoots = new Map();
   const loadNativeChoices = () => nativeChoicesPromise ||= (async () => {
+    for (const runtime of await currentAppRuntimes()) {
+      const choices = cachedNativeChoices(runtime);
+      if (choices) return choices;
+    }
     const url = [...document.querySelectorAll('script[src], link[rel="modulepreload"]')]
       .map(node => node.src || node.href).find(value => /^app:\/\/[-]\/assets\/app-shared-[\w-]+\.js$/.test(value));
     if (!url) throw new Error("Codex UI module is unavailable");
@@ -10054,13 +10085,7 @@ function writeFlag(api, id, on) {
     const module = await import(url);
     const React = module[nativeFactoryExport(source, ".createElement=function")]();
     const ReactDOM = module[nativeFactoryExport(source, ".createRoot=function")]();
-    const values = Object.values(module);
-    const Menu = values.find(value => value && typeof value === "object" && value.RadioGroup && value.RadioItem && value.Section && value.Title);
-    const Dropdown = values.find(value => {
-      if (typeof value !== "function") return false;
-      try { const text = Function.prototype.toString.call(value); return text.includes("triggerButton:") && text.includes("matchTriggerWidth:") && text.includes("onOpenAutoFocus:"); }
-      catch { return false; }
-    });
+    const { Menu, Dropdown } = choiceComponents(module);
     if (!React?.createElement || !ReactDOM?.createRoot || !Dropdown || !Menu) throw new Error("Codex dropdown components are unavailable");
     return { React, ReactDOM, Dropdown, Menu };
   })().catch(error => { nativeChoicesPromise = null; throw error; });
@@ -10070,6 +10095,7 @@ function writeFlag(api, id, on) {
       if (!container || container.contains(select)) {
         record.root.unmount();
         record.host.remove();
+        select.hidden = false;
         nativeChoiceRoots.delete(select);
       }
     }
@@ -10093,7 +10119,8 @@ function writeFlag(api, id, on) {
             const record = nativeChoiceRoots.get(select);
             record?.root.unmount();
             nativeChoiceRoots.delete(select);
-            if (host.isConnected) { host.textContent = "Codex 选项组件不可用，请重新打开设置"; host.setAttribute("role", "status"); }
+            host.remove();
+            select.hidden = false;
           });
         };
         const root = runtime.ReactDOM.createRoot(host, { onUncaughtError: fail });
@@ -10113,7 +10140,8 @@ function writeFlag(api, id, on) {
         record.render();
       }).catch(error => {
         rendererApi.log.warn("Native Codex dropdown unavailable", error);
-        if (host.isConnected) { host.textContent = "Codex 选项组件不可用，请重新打开设置"; host.setAttribute("role", "status"); }
+        host.remove();
+        select.hidden = false;
       });
     }
   }

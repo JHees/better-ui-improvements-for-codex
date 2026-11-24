@@ -4,7 +4,7 @@
 
 **Interface and workflow improvements for Codex Script Loader.**
 
-[![Version](https://img.shields.io/badge/version-1.5.6-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
+[![Version](https://img.shields.io/badge/version-1.5.7-14b8a6)](https://github.com/JHees/better-ui-improvements-for-codex)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Codex%20Script%20Loader-111827)](https://github.com/JHees/codex-script-loader)
 [![Mode](https://img.shields.io/badge/mode-renderer--only-7c3aed)](#compatibility)
@@ -19,9 +19,9 @@
 
 [Download](https://github.com/JHees/better-ui-improvements-for-codex/releases/latest) · [Install](#install) · [Contribute](CONTRIBUTING.md)
 
-Better UI Imropvement 1.5.6 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
+Better UI Imropvement 1.5.7 is a renderer-only plugin for [Codex Script Loader](https://github.com/JHees/codex-script-loader). It brings project-aware sidebar styling, reliable quota display, focused formula and local-image preview support, compacted-context title regeneration, native thread export and permanent deletion, and a dedicated settings page into one installable script.
 
-Version 1.5.6 restores project colors on pinned chats. Verified with Codex Desktop for Windows 26.1120.5083.0. [Release notes](docs/RELEASE-1.5.6.md)
+Version 1.5.7 restores the native dropdowns in color settings. Verified with Codex Desktop for Windows 26.1120.5083.0. [Release notes](docs/RELEASE-1.5.7.md)
 
 ## Highlights
 
